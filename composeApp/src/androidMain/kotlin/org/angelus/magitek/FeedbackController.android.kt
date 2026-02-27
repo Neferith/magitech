@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import kotlin.math.*
+import kotlin.random.Random
 
 actual class FeedbackController(private val context: Context) {
 
@@ -88,6 +89,18 @@ actual class FeedbackController(private val context: Context) {
             audioTrack.reloadStaticData()
             audioTrack.play()
         } catch (_: Exception) {}
+    }
+
+    actual fun triggerRandomVibration() {
+        // Vibration courte et irrégulière — comme un parasite électrique
+        val duration  = Random.nextLong(15L, 60L)
+        val amplitude = Random.nextInt(40, 120)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(duration)
+        }
     }
 
     actual fun release() {

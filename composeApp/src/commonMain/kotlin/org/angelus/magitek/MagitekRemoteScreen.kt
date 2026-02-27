@@ -333,8 +333,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.angelus.magitek.audio.rememberStaticHumPlayer
 import org.angelus.magitek.model.ButtonAssignment
 import org.angelus.magitek.model.ButtonConfig
+import org.angelus.magitek.model.CommandSpec
 import org.angelus.magitek.model.HiddenMessageEngine
 import org.angelus.magitek.model.HiddenState
 import org.angelus.magitek.model.buildDefaultButtonConfigs
@@ -343,6 +345,8 @@ import org.angelus.magitek.model.toDisplayBin64
 import org.angelus.magitek.model.toHex16
 import org.angelus.magitek.model.displayLabel
 import org.angelus.magitek.repository.rememberButtonRepository
+import org.angelus.magitek.ui.FrequencyDial
+import kotlin.random.Random
 
 // ── État d'un bouton ──────────────────────────────────────────────────────────
 
@@ -359,6 +363,17 @@ fun MagitekRemoteScreen() {
     val repository = rememberButtonRepository()
     val feedback   = rememberFeedbackController()
     val scope      = rememberCoroutineScope()
+
+    val staticHum = rememberStaticHumPlayer()
+
+    var isDraggingDial by remember { mutableStateOf(false) }
+
+// C'est tout. Le son démarre automatiquement au lancement via LaunchedEffect
+// et s'arrête proprement au DisposableEffect.
+
+// Optionnel — si tu veux ajuster le volume dynamiquement :
+ staticHum.volume = 0.009f  // encore plus discret
+// staticHum.volume = 0.08f  // un peu plus présent
 
     var runningMacroIndex by remember { mutableStateOf<Int?>(null) }
     var runningMacroJob   by remember { mutableStateOf<Job?>(null) }
@@ -382,8 +397,36 @@ fun MagitekRemoteScreen() {
     var showCommandPicker  by remember { mutableStateOf<Int?>(null) }
     var showMacroPicker    by remember { mutableStateOf<Int?>(null) }
 
+    var globalFrequency by remember { mutableStateOf(0L) }
+
     // Dispose feedback
     DisposableEffect(Unit) { onDispose { feedback.release() } }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            // Attente aléatoire entre 4 et 20 secondes
+            delay(Random.nextLong(4_000L, 8_000L))
+            feedback.triggerRandomVibration()
+        }
+    }
+
+    LaunchedEffect(isDraggingDial) {
+        if (isDraggingDial) {
+            // Monte progressivement
+            while (staticHum.volume < 0.25f) {
+                staticHum.volume = (staticHum.volume + 0.02f).coerceAtMost(0.25f)
+                delay(16L)
+            }
+        } else {
+            // Descend progressivement après un court délai
+            delay(400L)
+            while (staticHum.volume > 0.04f) {
+                staticHum.volume = (staticHum.volume - 0.015f).coerceAtLeast(0.04f)
+                delay(16L)
+            }
+        }
+    }
+
 
     // ── Gestion d'une pression simple (exécution) ─────────────────────────────
     /*fun executeButton(index: Int) {
@@ -438,7 +481,8 @@ fun MagitekRemoteScreen() {
         when (val assignment = config.assignment) {
             is ButtonAssignment.SingleCommand -> {
                 feedback.triggerCommandFeedback()
-                val bits = assignment.command.encode64()
+              //  val bits = assignment.command.encode64()
+                val bits = assignment.command.encode64WithFreq(globalFrequency)
                 screenLog = listOf(
                     "> CMD: ${assignment/*.command*/.displayLabel(config.customLabel)}",
                     "> HEX: 0x${bits.toHex16()}",
@@ -469,7 +513,8 @@ fun MagitekRemoteScreen() {
                     try {
                         do {
                             assignment.steps.forEachIndexed { i, step ->
-                                val bits = step.command.encode64()
+                                //val bits = step.command.encode64()
+                                val bits = step.command.encode64WithFreq(globalFrequency)
                                 screenLog = listOf(
                                     "> MACRO [${i + 1}/${assignment.steps.size}]: ${assignment.name}",
                                     "> CMD: ${step.command.shortLabel()}",
@@ -509,7 +554,13 @@ fun MagitekRemoteScreen() {
                     onLongPress      = { index -> editingButtonIndex = index; showAssignTypeFor = index },
                     modifier         = Modifier.weight(1f),
                 )
-                StatusBar()
+                FrequencyDial(
+                    frequency = globalFrequency,
+                    onChange  = { globalFrequency = it },
+                    onDragStart = { isDraggingDial = true },
+                    onDragEnd   = { isDraggingDial = false },
+                )
+                StatusBar(frequency = globalFrequency)
             }
         }
     }
@@ -853,7 +904,7 @@ fun DiodeIndicator() {
 // ── Barre de statut ───────────────────────────────────────────────────────────
 
 @Composable
-fun StatusBar() {
+fun StatusBar(frequency: Long) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -862,7 +913,12 @@ fun StatusBar() {
             .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        listOf("FREQ: --", "CONN: ---", "PROXIM: ---", "MODE: CTL").forEach { label ->
+        listOf(
+            "FREQ: ${frequency.toString(16).uppercase().padStart(5,'0')}",
+            "CONN: ---",
+            "PROXIM: ---",
+            "MODE: CTL",
+        ).forEach { label ->
             Text(text = label, style = MaterialTheme.typography.labelMedium.copy(fontSize = 8.sp))
         }
     }
@@ -907,4 +963,13 @@ private fun lineColor(lineIndex: Int, state: HiddenState): androidx.compose.ui.g
     lineIndex == 2 && state is HiddenState.Complete  -> GarlemaldColors.ImperialRedGlow
     lineIndex == 0                                   -> GarlemaldColors.ScreenGreen
     else                                             -> GarlemaldColors.ScreenGreenDim
+}
+
+fun CommandSpec.encode64WithFreq(freq: Long): Long {
+    val cmd12 = moduleCode.toLong(2).shl(8) or
+            submoduleCode.toLong(2).shl(4) or
+            actionCode.toLong(2)
+    // La fréquence globale écrase le freqOverride du bouton si elle est non nulle
+    val effectiveFreq = if (freq != 0L) freq else freqOverride
+    return effectiveFreq.shl(46) or cmd12.shl(34)
 }
