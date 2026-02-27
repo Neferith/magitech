@@ -344,11 +344,14 @@ import org.angelus.magitek.model.HiddenState
 import org.angelus.magitek.model.buildActivationFrequencies
 import org.angelus.magitek.model.buildDefaultButtonConfigs
 import org.angelus.magitek.model.buildDefaultSecrets
+import org.angelus.magitek.model.buildLocations
 import org.angelus.magitek.model.detect
 import org.angelus.magitek.model.toDisplayBin64
 import org.angelus.magitek.model.toHex16
 import org.angelus.magitek.model.displayLabel
+import org.angelus.magitek.model.findById
 import org.angelus.magitek.repository.rememberButtonRepository
+import org.angelus.magitek.settings.rememberMagitekSettings
 import org.angelus.magitek.ui.FrequencyDial
 import kotlin.random.Random
 
@@ -370,10 +373,34 @@ fun MagitekRemoteScreen() {
 
     val staticHum = rememberStaticHumPlayer()
 
-    val activationFrequencies = remember { buildActivationFrequencies() }
+    val appSettings = rememberMagitekSettings()
+    val locations   = remember { buildLocations() }
+    val currentLocation by remember(appSettings.locationId) {
+        derivedStateOf { locations.findById(appSettings.locationId) }
+    }
+
+    val activationFrequencies by remember(currentLocation) {
+        derivedStateOf { currentLocation.frequencies }
+    }
     var activeFrequency by remember { mutableStateOf<ActivationFrequency?>(null) }
 
     var isDraggingDial by remember { mutableStateOf(false) }
+
+    LaunchedEffect(appSettings.humVolume) {
+        if (!isDraggingDial && activeFrequency == null) {
+            val target = appSettings.humVolume / 100f * 0.3f  // 0..0.3
+            staticHum.volume = target
+        }
+    }
+
+    LaunchedEffect(appSettings.randomVibration) {
+        if (appSettings.randomVibration) {
+            while (true) {
+                delay(Random.nextLong(4_000L, 20_000L))
+                feedback.triggerRandomVibration()
+            }
+        }
+    }
 
 // C'est tout. Le son démarre automatiquement au lancement via LaunchedEffect
 // et s'arrête proprement au DisposableEffect.
@@ -409,13 +436,13 @@ fun MagitekRemoteScreen() {
     // Dispose feedback
     DisposableEffect(Unit) { onDispose { feedback.release() } }
 
-    LaunchedEffect(Unit) {
+    /*LaunchedEffect(Unit) {
         while (true) {
             // Attente aléatoire entre 4 et 20 secondes
             delay(Random.nextLong(4_000L, 8_000L))
             feedback.triggerRandomVibration()
         }
-    }
+    }*/
 
     LaunchedEffect(isDraggingDial, activeFrequency) {
         if (isDraggingDial) {
@@ -922,18 +949,33 @@ fun ImperialHeader(activeFrequency: ActivationFrequency? = null) {
         // Titre — remplacé par le nom de la fréquence si active
         Crossfade(targetState = activeFrequency, label = "header_title") { freq ->
             if (freq != null) {
+                Column {
                 Text(
-                    text  = ">> RÉSONNANCE DÉTECTÉE : ${freq.name} <<",
+                    text  = ">> RÉSONNANCE DÉTECTÉE : <<",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontSize = 10.sp,
                         color    = GarlemaldColors.ImperialRedGlow,
                     ),
                 )
+                    Text(
+                        text  = ">> ${freq.name} <<",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 10.sp,
+                            color    = GarlemaldColors.ImperialRedGlow,
+                        ),
+                    )
+                }
             } else {
-                Text(
-                    text  = "UNITÉ MAGITEK — TÉLÉCOMMANDE v3.7",
-                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 10.sp),
-                )
+                Column {
+                    Text(
+                        text = "UNITÉ MAGITEK — TÉLÉCOMMANDE v3.7",
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 10.sp),
+                    )
+                    Text(
+                        text = "GLOIRE A L'EMPIRE",
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 10.sp),
+                    )
+                }
             }
         }
 
