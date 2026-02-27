@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MagitekSettings" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">#AA1111</item>
+        <item name="colorPrimaryDark">#6B0000</item>
+        <item name="colorAccent">#AA1111</item>
+        <item name="android:windowBackground">#0A0A0A</item>
+        <item name="android:textColorPrimary">#CCCCCC</item>
+        <item name="android:textColorSecondary">#888888</item>
+    </style>
+</resources>

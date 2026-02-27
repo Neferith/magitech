@@ -22,7 +22,7 @@
         <activity
             android:name=".SettingsActivity"
             android:label="Paramètres Magitek"
-            android:theme="@style/Theme.AppCompat.DayNight"
+            android:theme="@style/Theme.MagitekSettings"
             android:parentActivityName=".MainActivity"
             android:exported="false">
             <intent-filter>
