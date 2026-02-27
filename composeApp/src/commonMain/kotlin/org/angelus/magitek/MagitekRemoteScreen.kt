@@ -1,3 +1,5 @@
+package org.angelus.magitek
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -8,9 +10,6 @@ import androidx.compose.ui.*
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.unit.*
-import org.angelus.magitek.GarlemaldColors
-import org.angelus.magitek.GarlemaldTheme
-import org.angelus.magitek.rememberFeedbackController
 
 // ── Modèle ────────────────────────────────────────────────────────────────────
 /*
@@ -320,31 +319,26 @@ fun StatusBar() {
 
 // commonMain/kotlin/org/angelus/magitek/ui/MagitekRemoteScreen.kt
 
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.*
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.angelus.magitek.CommandPickerDialog
-import org.angelus.magitek.MacroEditorDialog
-import org.angelus.magitek.displayDescription
 import org.angelus.magitek.model.ButtonAssignment
 import org.angelus.magitek.model.ButtonConfig
+import org.angelus.magitek.model.HiddenMessageEngine
+import org.angelus.magitek.model.HiddenState
 import org.angelus.magitek.model.buildDefaultButtonConfigs
+import org.angelus.magitek.model.buildDefaultSecrets
 import org.angelus.magitek.model.toDisplayBin64
 import org.angelus.magitek.model.toHex16
 import org.angelus.magitek.model.displayLabel
@@ -367,7 +361,10 @@ fun MagitekRemoteScreen() {
     val scope      = rememberCoroutineScope()
 
     var runningMacroIndex by remember { mutableStateOf<Int?>(null) }
-    var runningMacroJob   by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var runningMacroJob   by remember { mutableStateOf<Job?>(null) }
+
+    val hiddenEngine = remember { HiddenMessageEngine(buildDefaultSecrets()) }
+    var hiddenState  by remember { mutableStateOf<HiddenState>(HiddenState.Idle) }
 
     // Chargement de la configuration persistée
     var buttonConfigs by remember {
@@ -424,6 +421,10 @@ fun MagitekRemoteScreen() {
         }
     }*/
     fun executeButton(index: Int) {
+        // ← ICI, en tout premier, avant le check config == null
+        hiddenState = hiddenEngine.onButtonPressed(index)
+
+
         val config = buttonConfigs[index]
 
         if (config == null) {
@@ -475,12 +476,12 @@ fun MagitekRemoteScreen() {
                                     "> HEX: 0x${bits.toHex16()}",
                                 )
                                 feedback.triggerCommandFeedback()
-                                kotlinx.coroutines.delay(step.delayAfterMs)
+                                delay(step.delayAfterMs)
                             }
                         } while (assignment.loop)
 
                         if (!assignment.loop) screenLog = listOf("> MACRO: ${assignment.name}", "> TERMINÉE.")
-                    } catch (_: kotlinx.coroutines.CancellationException) {
+                    } catch (_: CancellationException) {
                         // Annulation propre — screenLog déjà mis à jour
                     } finally {
                         if (runningMacroIndex == index) {
@@ -500,7 +501,7 @@ fun MagitekRemoteScreen() {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ImperialHeader()
-                CommandScreen(lines = screenLog)
+                CommandScreen(lines = screenLog, hiddenState = hiddenState)
                 ButtonGrid(
                     buttonConfigs    = buttonConfigs,
                     runningMacroIndex = runningMacroIndex,
@@ -653,6 +654,8 @@ fun ButtonGrid(
 }
 // ── MagitekButton — ajouter isRunning ────────────────────────────────────────
 
+// Dans MagitekRemoteScreen.kt — remplacer MagitekButton par cette version
+
 @Composable
 fun MagitekButton(
     index      : Int,
@@ -661,7 +664,10 @@ fun MagitekButton(
     onTap      : () -> Unit,
     onLongPress: () -> Unit,
 ) {
-    // Animation de pulsation pour la macro en cours
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scope = rememberCoroutineScope()
+
     val infiniteTransition = rememberInfiniteTransition(label = "running_$index")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue  = 0.4f,
@@ -673,20 +679,29 @@ fun MagitekButton(
         label = "pulse_$index",
     )
 
-    val isMacro     = config?.assignment is ButtonAssignment.Macro
-    val isAssigned  = config != null
-    val bgColor     = when {
+    val isMacro    = config?.assignment is ButtonAssignment.Macro
+    val isAssigned = config != null
+
+    val bgColor = when {
+        isPressed  -> GarlemaldColors.ImperialRedDark
         isRunning  -> GarlemaldColors.MagitekBlueDim
         isMacro    -> GarlemaldColors.MagitekBlueDim.copy(alpha = 0.5f)
         isAssigned -> GarlemaldColors.SurfaceVariant
         else       -> GarlemaldColors.Background
     }
     val borderColor = when {
+        isPressed  -> GarlemaldColors.ImperialRedGlow
         isRunning  -> GarlemaldColors.MagitekBlue.copy(alpha = pulseAlpha)
         isMacro    -> GarlemaldColors.MagitekBlue
         isAssigned -> GarlemaldColors.Border
         else       -> GarlemaldColors.MetalDark.copy(alpha = 0.4f)
     }
+    val textColor = when {
+        isPressed  -> GarlemaldColors.OnImperialRed
+        isAssigned -> GarlemaldColors.OnSurface
+        else       -> GarlemaldColors.MetalDark
+    }
+
     val label = config?.assignment?.displayLabel(config.customLabel)
         ?: index.toString().padStart(2, '0')
 
@@ -697,6 +712,16 @@ fun MagitekButton(
             .border(1.dp, borderColor)
             .pointerInput(Unit) {
                 detectTapGestures(
+                    onPress = { offset ->
+                        // Émettre immédiatement le press → visuel rouge instantané
+                        val press = PressInteraction.Press(offset)
+                        scope.launch { interactionSource.emit(press) }
+                        val released = tryAwaitRelease()
+                        scope.launch {
+                            if (released) interactionSource.emit(PressInteraction.Release(press))
+                            else          interactionSource.emit(PressInteraction.Cancel(press))
+                        }
+                    },
                     onTap       = { onTap() },
                     onLongPress = { onLongPress() },
                 )
@@ -711,7 +736,6 @@ fun MagitekButton(
                 .align(Alignment.TopCenter)
                 .background(borderColor.copy(alpha = 0.5f)),
         )
-        // Indicateur ■ STOP si macro en cours
         if (isRunning) {
             Text(
                 text  = "■",
@@ -725,7 +749,7 @@ fun MagitekButton(
             Text(
                 text      = label,
                 style     = MaterialTheme.typography.labelLarge.copy(
-                    color    = if (isAssigned) GarlemaldColors.OnSurface else GarlemaldColors.MetalDark,
+                    color    = textColor,
                     fontSize = 7.sp,
                 ),
                 textAlign = TextAlign.Center,
@@ -739,7 +763,7 @@ fun MagitekButton(
 // ── Écran terminal ────────────────────────────────────────────────────────────
 
 @Composable
-fun CommandScreen(lines: List<String>) {
+fun CommandScreen(lines: List<String>, hiddenState: HiddenState) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -750,15 +774,35 @@ fun CommandScreen(lines: List<String>) {
             .padding(10.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+
+            // Lignes normales
             lines.forEachIndexed { i, line ->
+                // Sur la ligne BIN, on substitue les 34 bits réservés si besoin
+                val displayLine = if (i == 2 && line.startsWith("> BIN:")) {
+                    injectHiddenBits(line, hiddenState)
+                } else line
+
                 Text(
-                    text  = line,
+                    text  = displayLine,
                     style = MaterialTheme.typography.displayMedium.copy(
                         fontSize = if (i == 0) 11.sp else 9.sp,
-                        color    = if (i == 0) GarlemaldColors.ScreenGreen else GarlemaldColors.ScreenGreenDim,
+                        color    = lineColor(i, hiddenState),
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Clip,
+                )
+            }
+
+            // Message complet révélé → ligne supplémentaire
+            if (hiddenState is HiddenState.Complete) {
+                Text(
+                    text  = "> !! ${hiddenState.fullMessage} !!",
+                    style = MaterialTheme.typography.displayMedium.copy(
+                        fontSize     = 11.sp,
+                        color        = GarlemaldColors.ImperialRedGlow,
+                        letterSpacing = 3.sp,
+                    ),
+                    maxLines = 1,
                 )
             }
         }
@@ -833,4 +877,34 @@ fun drawScanlines(scope: DrawScope) {
         scope.drawLine(lineColor, Offset(0f, y), Offset(scope.size.width, y), strokeWidth = 1.5f)
         y += 4f
     }
+}
+
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Remplace les 34 derniers bits de la ligne BIN par les bits du message caché.
+ * Format attendu : "> BIN: [18 freq] | [4.4.4 cmd] | [34 réservés]"
+ */
+private fun injectHiddenBits(line: String, state: HiddenState): String {
+    val bits34 = when (state) {
+        is HiddenState.Revealing -> state.bits34
+        is HiddenState.Complete  -> state.bits34
+        else                     -> return line
+    }
+    val sepIndex = line.lastIndexOf("| ")
+    if (sepIndex < 0) return line
+    return line.substring(0, sepIndex + 2) + bits34
+}
+
+/**
+ * Couleur de la ligne selon l'état du message caché.
+ */
+@Composable
+private fun lineColor(lineIndex: Int, state: HiddenState): androidx.compose.ui.graphics.Color = when {
+    // La ligne BIN pulse en bleu magitek quand une séquence est en cours
+    lineIndex == 2 && state is HiddenState.Revealing -> GarlemaldColors.MagitekBlue
+    lineIndex == 2 && state is HiddenState.Complete  -> GarlemaldColors.ImperialRedGlow
+    lineIndex == 0                                   -> GarlemaldColors.ScreenGreen
+    else                                             -> GarlemaldColors.ScreenGreenDim
 }
