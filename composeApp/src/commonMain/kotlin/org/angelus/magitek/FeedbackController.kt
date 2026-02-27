@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 expect class FeedbackController {
     fun triggerCommandFeedback()
     fun triggerRandomVibration()
+    fun triggerActivationSound()   // ← nouveau
     fun release()
 }
 

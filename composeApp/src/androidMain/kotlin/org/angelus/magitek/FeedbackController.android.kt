@@ -16,6 +16,7 @@ import android.os.VibratorManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import kotlin.math.*
 import kotlin.random.Random
 
@@ -100,6 +101,51 @@ actual class FeedbackController(private val context: Context) {
         } else {
             @Suppress("DEPRECATION")
             vibrator.vibrate(duration)
+        }
+    }
+
+    actual fun triggerActivationSound() {
+        // Tonalité de verrouillage — deux impulsions montantes courtes
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+        scope.launch {
+            playTone(frequency = 660.0, durationMs = 80, volume = 0.5)
+            kotlinx.coroutines.delay(60L)
+            playTone(frequency = 880.0, durationMs = 120, volume = 0.7)
+        }
+    }
+
+    // Helper interne à ajouter dans la classe FeedbackController Android :
+    private fun playTone(frequency: Double, durationMs: Int, volume: Double) {
+        val samples = sampleRate * durationMs / 1000
+        val buffer  = ShortArray(samples)
+        for (i in 0 until samples) {
+            val t        = i.toDouble() / sampleRate
+            val envelope = kotlin.math.exp(-t * 8.0)
+            val signal   = kotlin.math.sin(2.0 * kotlin.math.PI * frequency * t)
+            buffer[i]    = (signal * envelope * volume * Short.MAX_VALUE)
+                .coerceIn(Short.MIN_VALUE.toDouble(), Short.MAX_VALUE.toDouble())
+                .toInt().toShort()
+        }
+        val track = android.media.AudioTrack(
+            android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build(),
+            android.media.AudioFormat.Builder()
+                .setSampleRate(sampleRate)
+                .setEncoding(android.media.AudioFormat.ENCODING_PCM_16BIT)
+                .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_MONO)
+                .build(),
+            buffer.size * 2,
+            android.media.AudioTrack.MODE_STATIC,
+            android.media.AudioManager.AUDIO_SESSION_ID_GENERATE,
+        )
+        track.write(buffer, 0, buffer.size)
+        track.play()
+        // Le track se libère après lecture (non bloquant)
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            kotlinx.coroutines.delay(durationMs.toLong() + 200L)
+            track.release()
         }
     }
 

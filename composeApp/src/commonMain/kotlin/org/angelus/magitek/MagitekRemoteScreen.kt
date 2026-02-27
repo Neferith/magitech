@@ -1,5 +1,6 @@
 package org.angelus.magitek
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -334,13 +335,16 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.angelus.magitek.audio.rememberStaticHumPlayer
+import org.angelus.magitek.model.ActivationFrequency
 import org.angelus.magitek.model.ButtonAssignment
 import org.angelus.magitek.model.ButtonConfig
 import org.angelus.magitek.model.CommandSpec
 import org.angelus.magitek.model.HiddenMessageEngine
 import org.angelus.magitek.model.HiddenState
+import org.angelus.magitek.model.buildActivationFrequencies
 import org.angelus.magitek.model.buildDefaultButtonConfigs
 import org.angelus.magitek.model.buildDefaultSecrets
+import org.angelus.magitek.model.detect
 import org.angelus.magitek.model.toDisplayBin64
 import org.angelus.magitek.model.toHex16
 import org.angelus.magitek.model.displayLabel
@@ -365,6 +369,9 @@ fun MagitekRemoteScreen() {
     val scope      = rememberCoroutineScope()
 
     val staticHum = rememberStaticHumPlayer()
+
+    val activationFrequencies = remember { buildActivationFrequencies() }
+    var activeFrequency by remember { mutableStateOf<ActivationFrequency?>(null) }
 
     var isDraggingDial by remember { mutableStateOf(false) }
 
@@ -410,22 +417,31 @@ fun MagitekRemoteScreen() {
         }
     }
 
-    LaunchedEffect(isDraggingDial) {
+    LaunchedEffect(isDraggingDial, activeFrequency) {
         if (isDraggingDial) {
-            // Monte progressivement
+            // Monte pendant le drag
             while (staticHum.volume < 0.25f) {
                 staticHum.volume = (staticHum.volume + 0.02f).coerceAtMost(0.25f)
                 delay(16L)
             }
         } else {
-            // Descend progressivement après un court délai
             delay(400L)
-            while (staticHum.volume > 0.04f) {
-                staticHum.volume = (staticHum.volume - 0.015f).coerceAtLeast(0.04f)
-                delay(16L)
+            // Reste fort si résonance active, redescend sinon
+            val target = if (activeFrequency != null) 0.25f else 0.04f
+            if (target > staticHum.volume) {
+                while (staticHum.volume < target) {
+                    staticHum.volume = (staticHum.volume + 0.02f).coerceAtMost(target)
+                    delay(16L)
+                }
+            } else {
+                while (staticHum.volume > target) {
+                    staticHum.volume = (staticHum.volume - 0.015f).coerceAtLeast(target)
+                    delay(16L)
+                }
             }
         }
     }
+
 
 
     // ── Gestion d'une pression simple (exécution) ─────────────────────────────
@@ -545,8 +561,8 @@ fun MagitekRemoteScreen() {
                 modifier            = Modifier.fillMaxSize().padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                ImperialHeader()
-                CommandScreen(lines = screenLog, hiddenState = hiddenState)
+                ImperialHeader(activeFrequency = activeFrequency)
+                CommandScreen(lines = screenLog, hiddenState = hiddenState, activeFrequency = activeFrequency)
                 ButtonGrid(
                     buttonConfigs    = buttonConfigs,
                     runningMacroIndex = runningMacroIndex,
@@ -556,7 +572,17 @@ fun MagitekRemoteScreen() {
                 )
                 FrequencyDial(
                     frequency = globalFrequency,
-                    onChange  = { globalFrequency = it },
+                    onChange  = {
+                            freq ->
+                        globalFrequency = freq
+                        val detected = activationFrequencies.detect(freq)
+                        if (detected != activeFrequency) {
+                            activeFrequency = detected
+                            if (detected != null) {
+                                feedback.triggerActivationSound()
+                            }
+                        }
+                                },
                     onDragStart = { isDraggingDial = true },
                     onDragEnd   = { isDraggingDial = false },
                 )
@@ -814,21 +840,26 @@ fun MagitekButton(
 // ── Écran terminal ────────────────────────────────────────────────────────────
 
 @Composable
-fun CommandScreen(lines: List<String>, hiddenState: HiddenState) {
+fun CommandScreen(
+    lines          : List<String>,
+    hiddenState    : HiddenState,
+    activeFrequency: ActivationFrequency? = null,
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(110.dp)
             .background(GarlemaldColors.ScreenBackground)
-            .border(2.dp, GarlemaldColors.ScreenGreenDim)
+            .border(
+                width = 2.dp,
+                color = if (activeFrequency != null) GarlemaldColors.ImperialRed
+                else GarlemaldColors.ScreenGreenDim,
+            )
             .drawBehind { drawScanlines(this) }
             .padding(10.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-
-            // Lignes normales
             lines.forEachIndexed { i, line ->
-                // Sur la ligne BIN, on substitue les 34 bits réservés si besoin
                 val displayLine = if (i == 2 && line.startsWith("> BIN:")) {
                     injectHiddenBits(line, hiddenState)
                 } else line
@@ -844,18 +875,29 @@ fun CommandScreen(lines: List<String>, hiddenState: HiddenState) {
                 )
             }
 
-            // Message complet révélé → ligne supplémentaire
             if (hiddenState is HiddenState.Complete) {
                 Text(
                     text  = "> !! ${hiddenState.fullMessage} !!",
                     style = MaterialTheme.typography.displayMedium.copy(
-                        fontSize     = 11.sp,
-                        color        = GarlemaldColors.ImperialRedGlow,
+                        fontSize      = 11.sp,
+                        color         = GarlemaldColors.ImperialRedGlow,
                         letterSpacing = 3.sp,
                     ),
                     maxLines = 1,
                 )
             }
+        }
+
+        // Indicateur fréquence active en bas à droite de l'écran
+        if (activeFrequency != null) {
+            Text(
+                text     = "◆ SYNC",
+                style    = MaterialTheme.typography.displayMedium.copy(
+                    fontSize = 9.sp,
+                    color    = GarlemaldColors.ImperialRed,
+                ),
+                modifier = Modifier.align(Alignment.BottomEnd),
+            )
         }
     }
 }
@@ -863,23 +905,58 @@ fun CommandScreen(lines: List<String>, hiddenState: HiddenState) {
 // ── En-tête ───────────────────────────────────────────────────────────────────
 
 @Composable
-fun ImperialHeader() {
+fun ImperialHeader(activeFrequency: ActivationFrequency? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(GarlemaldColors.SurfaceVariant)
-            .border(1.dp, GarlemaldColors.ImperialRedDark)
+            .border(
+                width = 1.dp,
+                color = if (activeFrequency != null) GarlemaldColors.ImperialRed
+                else GarlemaldColors.ImperialRedDark,
+            )
             .padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment     = Alignment.CenterVertically,
     ) {
-        Text(
-            text  = "UNITÉ MAGITEK — TÉLÉCOMMANDE v3.7",
-            style = MaterialTheme.typography.titleMedium.copy(fontSize = 10.sp),
-        )
-        DiodeIndicator()
+        // Titre — remplacé par le nom de la fréquence si active
+        Crossfade(targetState = activeFrequency, label = "header_title") { freq ->
+            if (freq != null) {
+                Text(
+                    text  = ">> RÉSONNANCE DÉTECTÉE : ${freq.name} <<",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = 10.sp,
+                        color    = GarlemaldColors.ImperialRedGlow,
+                    ),
+                )
+            } else {
+                Text(
+                    text  = "UNITÉ MAGITEK — TÉLÉCOMMANDE v3.7",
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 10.sp),
+                )
+            }
+        }
+
+        // Diode — fixe si fréquence active, clignotante sinon
+        if (activeFrequency != null) {
+            DiodeFixed()
+        } else {
+            DiodeIndicator()
+        }
     }
 }
+
+// Diode fixe (pas d'animation) pour fréquence verrouillée
+@Composable
+fun DiodeFixed() {
+    Box(
+        modifier = Modifier
+            .size(10.dp)
+            .background(GarlemaldColors.DiodRed, androidx.compose.foundation.shape.RoundedCornerShape(50))
+            .border(1.dp, GarlemaldColors.ImperialRedGlow, androidx.compose.foundation.shape.RoundedCornerShape(50)),
+    )
+}
+
 
 @Composable
 fun DiodeIndicator() {
