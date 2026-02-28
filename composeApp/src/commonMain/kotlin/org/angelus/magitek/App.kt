@@ -58,7 +58,7 @@ fun App() {
 
     GarlemaldTheme {
         when (orientation) {
-            DeviceOrientation.LANDSCAPE -> BackOfRemoteScreen(isEditMode = isUnlocked)
+            DeviceOrientation.LANDSCAPE -> BackOfRemoteScreen()
             DeviceOrientation.PORTRAIT  -> MagitekRemoteScreen(
                 editModeController = editModeController,
                 isEditMode         = isUnlocked,

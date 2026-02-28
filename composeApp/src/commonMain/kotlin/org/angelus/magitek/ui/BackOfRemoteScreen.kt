@@ -2,172 +2,221 @@
 
 package org.angelus.magitek.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
-import org.angelus.magitek.GarlemaldColors
 import org.angelus.magitek.GarlemaldTheme
-import org.angelus.magitek.drawScanlines
 import org.angelus.magitek.model.*
 
 @Composable
-fun BackOfRemoteScreen(
-    isEditMode: Boolean = false,
-) {
-    val message = remember { buildHiddenBackMessage() }
+fun BackOfRemoteScreen() {
+    val message     = remember { buildHiddenBackMessage() }
+    val scrollState = rememberScrollState()
 
     GarlemaldTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color    = GarlemaldColors.Background,
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .drawBehind { drawMetalBackground(this) },
         ) {
             Column(
-                modifier            = Modifier
+                modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
+                    .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // ── En-tête ───────────────────────────────────────────────────
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(GarlemaldColors.SurfaceVariant)
-                        .border(1.dp, GarlemaldColors.ImperialRedDark)
-                        .padding(10.dp),
-                ) {
-                    Text(
-                        text     = message.title,
-                        style    = MaterialTheme.typography.titleMedium.copy(fontSize = 11.sp),
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center,
-                    )
-                }
+                // ── Titre en haut, horizontal ─────────────────────────────
+                EngravedText(
+                    text          = message.title,
+                    fontSize      = 11.sp,
+                    modifier      = Modifier.fillMaxWidth(),
+                    textAlign     = TextAlign.Center,
+                    letterSpacing = 4.sp,
+                )
 
-                // ── Corps du message encodé ───────────────────────────────────
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
+                EngravedHorizontalDivider()
+
+                // ── Codes en colonnes verticales, scrollable ───────────────
+                Row(
+                    modifier              = Modifier
                         .weight(1f)
-                        .background(GarlemaldColors.ScreenBackground)
-                        .border(2.dp, GarlemaldColors.ScreenGreenDim)
-                        .drawBehind { drawScanlines(this) }
-                        .padding(16.dp),
+                        .fillMaxWidth()
+                        .horizontalScroll(scrollState),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalAlignment     = Alignment.Top,
                 ) {
-                    Column(
-                        modifier            = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        message.words.forEachIndexed { wordIndex, codes ->
-                            WordRow(
-                                wordIndex  = wordIndex,
-                                codes      = codes,
-                                isEditMode = isEditMode,
-                            )
+                    message.words.reversed().forEachIndexed { i, codes ->
+                        EngravedCodeColumn(codes = codes)
+                        if (i < message.words.size - 1) {
+                            EngravedVerticalDivider()
                         }
                     }
                 }
 
-                // ── Pied — indication de rotation ────────────────────────────
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment     = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text  = "↺  PIVOTER POUR REVENIR  ↻",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontSize      = 8.sp,
-                            color         = GarlemaldColors.MetalDark,
-                            letterSpacing = 2.sp,
-                        ),
-                    )
-                }
+                EngravedHorizontalDivider()
+
+                // ── Pied en bas, horizontal ───────────────────────────────
+                EngravedText(
+                    text          = "GARLEAN MAGITEK AUTHORITY  //  RESTRICTED",
+                    fontSize      = 7.sp,
+                    modifier      = Modifier.fillMaxWidth(),
+                    textAlign     = TextAlign.Center,
+                    letterSpacing = 2.sp,
+                    alpha         = 0.5f,
+                )
             }
         }
     }
 }
 
-// ── Ligne d'un mot encodé ─────────────────────────────────────────────────────
+// ── Colonne de codes verticaux ────────────────────────────────────────────────
 
 @Composable
-private fun WordRow(
-    wordIndex : Int,
-    codes     : List<String>,
-    isEditMode: Boolean,
+private fun EngravedCodeColumn(codes: List<String>) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        codes.forEach { code ->
+            EngravedText(
+                text          = code,
+                fontSize      = 13.sp,
+                letterSpacing = 2.sp,
+            )
+        }
+    }
+}
+
+// ── Texte gravé ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun EngravedText(
+    text         : String,
+    fontSize     : TextUnit,
+    modifier     : Modifier = Modifier,
+    textAlign    : TextAlign = TextAlign.Start,
+    letterSpacing: TextUnit = TextUnit.Unspecified,
+    alpha        : Float = 1f,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        // Index du mot en guise de "numéro de ligne"
-        Text(
-            text  = "> ${(wordIndex + 1).toString().padStart(2, '0')}",
-            style = MaterialTheme.typography.displayMedium.copy(
-                fontSize = 8.sp,
-                color    = GarlemaldColors.ScreenGreenDim,
+    Text(
+        text      = text,
+        textAlign = textAlign,
+        style     = MaterialTheme.typography.labelMedium.copy(
+            fontSize      = fontSize,
+            color         = Color(0xFF888888).copy(alpha = alpha),
+            letterSpacing = letterSpacing,
+            fontFamily    = androidx.compose.ui.text.font.FontFamily.Monospace,
+            shadow        = Shadow(
+                color      = Color.Black,
+                offset     = Offset(1f, 1f),
+                blurRadius = 0f,
+            ),
+        ),
+        modifier = modifier,
+    )
+}
+
+// ── Séparateur horizontal gravé ───────────────────────────────────────────────
+
+@Composable
+private fun EngravedHorizontalDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(4.dp)
+            .drawBehind {
+                drawLine(
+                    color       = Color(0xFF000000),
+                    start       = Offset(0f, size.height / 2f),
+                    end         = Offset(size.width, size.height / 2f),
+                    strokeWidth = 1f,
+                )
+                drawLine(
+                    color       = Color(0x22FFFFFF),
+                    start       = Offset(0f, size.height / 2f + 1f),
+                    end         = Offset(size.width, size.height / 2f + 1f),
+                    strokeWidth = 1f,
+                )
+            },
+    )
+}
+
+// ── Séparateur vertical gravé ─────────────────────────────────────────────────
+
+@Composable
+private fun EngravedVerticalDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(4.dp)
+            .drawBehind {
+                drawLine(
+                    color       = Color(0xFF000000),
+                    start       = Offset(size.width / 2f, 0f),
+                    end         = Offset(size.width / 2f, size.height),
+                    strokeWidth = 1f,
+                )
+                drawLine(
+                    color       = Color(0x22FFFFFF),
+                    start       = Offset(size.width / 2f + 1f, 0f),
+                    end         = Offset(size.width / 2f + 1f, size.height),
+                    strokeWidth = 1f,
+                )
+            },
+    )
+}
+
+// ── Fond métal brossé ─────────────────────────────────────────────────────────
+
+private fun drawMetalBackground(scope: DrawScope) {
+    with(scope) {
+        drawRect(color = Color(0xFF1A1A1A))
+
+        val lineColor = Color(0x08FFFFFF)
+        var y = 0f
+        while (y < size.height) {
+            drawLine(
+                color       = lineColor,
+                start       = Offset(0f, y),
+                end         = Offset(size.width, y),
+                strokeWidth = 1f,
+            )
+            y += 3f
+        }
+
+        drawRect(
+            brush = Brush.radialGradient(
+                colors  = listOf(Color.Transparent, Color(0x99000000)),
+                center  = Offset(size.width / 2f, size.height / 2f),
+                radius  = size.width * 0.8f,
             ),
         )
 
-        // Codes des caractères
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            codes.forEach { code ->
-                CodeChip(code = code, isEditMode = isEditMode)
-            }
-        }
-    }
-}
-
-// ── Puce d'un code ────────────────────────────────────────────────────────────
-
-@Composable
-private fun CodeChip(
-    code      : String,
-    isEditMode: Boolean,
-) {
-    val decoded = remember(code) {
-        val index = ButtonLabelEncoder.decode(code)
-        if (index != null) MagitekCipher.decode(listOf(code)) else "?"
-    }
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        // Code 3 lettres
-        Box(
-            modifier = Modifier
-                .background(GarlemaldColors.SurfaceVariant)
-                .border(1.dp, GarlemaldColors.ScreenGreenDim)
-                .padding(horizontal = 6.dp, vertical = 4.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text  = code,
-                style = MaterialTheme.typography.displayMedium.copy(
-                    fontSize      = 11.sp,
-                    color         = GarlemaldColors.ScreenGreen,
-                    letterSpacing = 1.sp,
-                ),
-            )
-        }
-
-        // Caractère décodé — visible uniquement en mode édition
-        if (isEditMode) {
-            Text(
-                text  = decoded,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontSize = 9.sp,
-                    color    = GarlemaldColors.ImperialRed,
-                ),
+        val screwRadius = 6f
+        val margin      = 14f
+        listOf(
+            Offset(margin, margin),
+            Offset(size.width - margin, margin),
+            Offset(margin, size.height - margin),
+            Offset(size.width - margin, size.height - margin),
+        ).forEach { center ->
+            drawCircle(color = Color(0xFF2A2A2A), radius = screwRadius, center = center)
+            drawCircle(color = Color(0xFF444444), radius = screwRadius, center = center, style = Stroke(1f))
+            drawLine(
+                color       = Color(0xFF111111),
+                start       = Offset(center.x - screwRadius * 0.6f, center.y),
+                end         = Offset(center.x + screwRadius * 0.6f, center.y),
+                strokeWidth = 1.5f,
             )
         }
     }
