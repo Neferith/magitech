@@ -7,7 +7,7 @@ package org.angelus.magitek.model
  * Quand la molette est dans la plage [target - tolerance, target + tolerance],
  * la diode devient fixe et un son spécial joue.
  */
-data class ActivationFrequency(
+/*data class ActivationFrequency(
     val name     : String,
     val target   : Long,
     val tolerance: Long = 500L,
@@ -22,4 +22,4 @@ fun buildActivationFrequencies(): List<ActivationFrequency> = listOf(
 fun List<ActivationFrequency>.detect(frequency: Long): ActivationFrequency? =
     firstOrNull { abs(frequency - it.target) <= it.tolerance }
 
-private fun abs(x: Long) = if (x < 0) -x else x
+private fun abs(x: Long) = if (x < 0) -x else x*/

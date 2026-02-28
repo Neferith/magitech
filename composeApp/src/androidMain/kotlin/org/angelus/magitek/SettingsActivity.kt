@@ -6,6 +6,9 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.*
 import org.angelus.magitek.model.buildLocations
+import org.angelus.magitek.settings.MagitekSettings
+import org.angelus.magitek.settings.PREF_CURRENT_X
+import org.angelus.magitek.settings.PREF_CURRENT_Y
 
 class SettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,6 +53,24 @@ class MagitekSettingsFragment : PreferenceFragmentCompat() {
         }
         catLocation.addPreference(locationPref)
 
+        val positionXPref = EditTextPreference(context).apply {
+            key         = PREF_CURRENT_X
+            title       = "Position X"
+            summary     = "Coordonnée X actuelle"
+            dialogTitle = "Coordonnée X"
+            setOnBindEditTextListener { it.inputType = android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL or android.text.InputType.TYPE_CLASS_NUMBER }
+        }
+        catLocation.addPreference(positionXPref)
+
+        val positionYPref = EditTextPreference(context).apply {
+            key         = PREF_CURRENT_Y
+            title       = "Position Y"
+            summary     = "Coordonnée Y actuelle"
+            dialogTitle = "Coordonnée Y"
+            setOnBindEditTextListener { it.inputType = android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL or android.text.InputType.TYPE_CLASS_NUMBER }
+        }
+        catLocation.addPreference(positionYPref)
+
         // ── Catégorie : Appareil ──────────────────────────────────────────────
         val catDevice = PreferenceCategory(context).apply {
             title = "APPAREIL"
@@ -77,6 +98,8 @@ class MagitekSettingsFragment : PreferenceFragmentCompat() {
 
         preferenceScreen = screen
     }
+
+
 
     companion object {
         const val PREF_LOCATION_ID       = "location_id"

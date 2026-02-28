@@ -34,12 +34,13 @@ import org.angelus.magitek.model.CommandSpec
 import org.angelus.magitek.model.EditModeController
 import org.angelus.magitek.model.HiddenMessageEngine
 import org.angelus.magitek.model.HiddenState
+import org.angelus.magitek.model.ResonanceLevel
 import org.angelus.magitek.model.buildActivationFrequencies
 import org.angelus.magitek.model.buildDefaultButtonConfigs
 import org.angelus.magitek.model.buildDefaultSecrets
 import org.angelus.magitek.model.buildEditModeController
 import org.angelus.magitek.model.buildLocations
-import org.angelus.magitek.model.detect
+import org.angelus.magitek.model.detectWithLevel
 import org.angelus.magitek.model.toDisplayBin64
 import org.angelus.magitek.model.toHex16
 import org.angelus.magitek.model.displayLabel
@@ -85,7 +86,7 @@ fun MagitekRemoteScreen(
     val activationFrequencies by remember(currentLocation) {
         derivedStateOf { currentLocation.frequencies }
     }
-    var activeFrequency by remember { mutableStateOf<ActivationFrequency?>(null) }
+    var resonanceLevel by remember { mutableStateOf<ResonanceLevel?>(null) }
 
     var isDraggingDial by remember { mutableStateOf(false) }
 
@@ -136,7 +137,7 @@ fun MagitekRemoteScreen(
     }*/
 
     LaunchedEffect(appSettings.humVolume) {
-        if (!isDraggingDial && activeFrequency == null) {
+        if (!isDraggingDial && resonanceLevel != null) {
             val target = appSettings.humVolume / 100f * 0.3f  // 0..0.3
             staticHum.volume = target
         }
@@ -160,8 +161,8 @@ fun MagitekRemoteScreen(
         }
     }
 
-    LaunchedEffect(isDraggingDial, activeFrequency) {
-        if (isDraggingDial) {
+    LaunchedEffect(isDraggingDial, resonanceLevel) {
+       /* if (isDraggingDial) {
             // Monte pendant le drag
             while (staticHum.volume < 0.25f) {
                 staticHum.volume = (staticHum.volume + 0.02f).coerceAtMost(0.25f)
@@ -171,6 +172,26 @@ fun MagitekRemoteScreen(
             delay(400L)
             // Reste fort si résonance active, redescend sinon
             val target = if (activeFrequency != null) 0.25f else 0.04f
+            if (target > staticHum.volume) {
+                while (staticHum.volume < target) {
+                    staticHum.volume = (staticHum.volume + 0.02f).coerceAtMost(target)
+                    delay(16L)
+                }
+            } else {
+                while (staticHum.volume > target) {
+                    staticHum.volume = (staticHum.volume - 0.015f).coerceAtLeast(target)
+                    delay(16L)
+                }
+            }
+        }*/
+        if (isDraggingDial) {
+            while (staticHum.volume < 0.25f) {
+                staticHum.volume = (staticHum.volume + 0.02f).coerceAtMost(0.25f)
+                delay(16L)
+            }
+        } else {
+            delay(400L)
+            val target = resonanceLevel?.let { 0.04f + it.level * 0.21f } ?: 0.04f
             if (target > staticHum.volume) {
                 while (staticHum.volume < target) {
                     staticHum.volume = (staticHum.volume + 0.02f).coerceAtMost(target)
@@ -316,13 +337,14 @@ fun MagitekRemoteScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ImperialHeader(
-                    activeFrequency = activeFrequency,
+                    resonanceLevel  = resonanceLevel,
+                    locationName    = currentLocation.name.takeIf { it != "Aucun" },
                     glitchEngine = glitchEngine,
                 )
                 CommandScreen(
                     lines = screenLog,
                     hiddenState = hiddenState,
-                    activeFrequency = activeFrequency,
+                    resonanceLevel = resonanceLevel,
                     glitchEngine = glitchEngine,
                     isEditMode = isEditMode,
                 )
@@ -341,14 +363,28 @@ fun MagitekRemoteScreen(
                 FrequencyDial(
                     frequency = globalFrequency,
                     onChange = { freq ->
-                        globalFrequency = freq
+                       /* globalFrequency = freq
                         val detected = activationFrequencies.detect(freq)
                         if (detected != activeFrequency) {
                             activeFrequency = detected
                             if (detected != null) {
                                 feedback.triggerActivationSound()
                             }
+                        }*/
+                        globalFrequency = freq
+                        val detected = activationFrequencies.detectWithLevel(
+                            frequency = freq,
+                            currentX  = appSettings.currentX,
+                            currentY  = appSettings.currentY,
+                        )
+                        if (detected?.frequency != resonanceLevel?.frequency) {
+                            resonanceLevel = detected
+                            if (detected != null) feedback.triggerActivationSound()
+                        } else {
+                            // Même fréquence — mise à jour du niveau seulement
+                            resonanceLevel = detected
                         }
+
                     },
                     onDragStart = { isDraggingDial = true },
                     onDragEnd = { isDraggingDial = false },
@@ -620,7 +656,7 @@ fun CommandScreen(
     lines: List<String>,
     hiddenState: HiddenState,
     isEditMode: Boolean,
-    activeFrequency: ActivationFrequency? = null,
+    resonanceLevel : ResonanceLevel? = null,
     glitchEngine: GlitchEngine,
 ) {
     val displayLines = glitchEngine.corruptedLines ?: lines
@@ -633,8 +669,11 @@ fun CommandScreen(
             .background(GarlemaldColors.ScreenBackground)
             .border(
                 width = 2.dp,
-                color = if (activeFrequency != null) GarlemaldColors.ImperialRed
-                else GarlemaldColors.ScreenGreenDim,
+                color = when {
+                    resonanceLevel?.isComplete == true -> GarlemaldColors.ImperialRed
+                    resonanceLevel != null             -> GarlemaldColors.ImperialRed.copy(alpha = resonanceLevel.level)
+                    else                               -> GarlemaldColors.ScreenGreenDim
+                },
             )
             .drawBehind {
                 // Scanlines avec shift
@@ -684,12 +723,15 @@ fun CommandScreen(
                 )
             }
         }
-        if (activeFrequency != null) {
+        // Indicateur résonance en bas à droite
+        if (resonanceLevel != null) {
             Text(
-                text = "◆ SYNC",
-                style = MaterialTheme.typography.displayMedium.copy(
+                text     = if (resonanceLevel.isComplete) "◆ SYNC" else "◇ ${resonanceLevel.percent}%",
+                style    = MaterialTheme.typography.displayMedium.copy(
                     fontSize = 9.sp,
-                    color = GarlemaldColors.ImperialRed,
+                    color    = GarlemaldColors.ImperialRed.copy(
+                        alpha = 0.5f + resonanceLevel.level * 0.5f
+                    ),
                 ),
                 modifier = Modifier.align(Alignment.BottomEnd),
             )
@@ -718,65 +760,104 @@ fun drawScanlines(scope: DrawScope, offsetX: Float = 0f) {
 // ── En-tête ───────────────────────────────────────────────────────────────────
 
 @Composable
-fun ImperialHeader(activeFrequency: ActivationFrequency? = null, glitchEngine: GlitchEngine) {
+fun ImperialHeader(
+    resonanceLevel  : ResonanceLevel? = null,
+    locationName    : String? = null,
+    glitchEngine    : GlitchEngine,
+   // onSettingsClick : () -> Unit = {},
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(GarlemaldColors.SurfaceVariant)
             .border(
                 width = 1.dp,
-                color = if (activeFrequency != null) GarlemaldColors.ImperialRed
-                else GarlemaldColors.ImperialRedDark,
+                color = when {
+                    resonanceLevel?.isComplete == true -> GarlemaldColors.ImperialRed
+                    resonanceLevel != null             -> GarlemaldColors.ImperialRed.copy(alpha = resonanceLevel.level * 0.8f)
+                    else                               -> GarlemaldColors.ImperialRedDark
+                },
             )
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment     = Alignment.CenterVertically,
     ) {
-        // Titre — remplacé par le nom de la fréquence si active
-        Crossfade(targetState = activeFrequency, label = "header_title") { freq ->
-            if (freq != null) {
-                Column {
+        Column(modifier = Modifier.weight(1f)) {
+            Crossfade(targetState = resonanceLevel, label = "header_title") { lvl ->
+                if (lvl != null) {
                     Text(
-                        text = ">> RÉSONNANCE DÉTECTÉE : <<",
+                        text  = ">> ${lvl.frequency.name} — ${lvl.label} (${lvl.percent}%) <<",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontSize = 10.sp,
-                            color = GarlemaldColors.ImperialRedGlow,
+                            color    = GarlemaldColors.ImperialRedGlow.copy(alpha = 0.5f + lvl.level * 0.5f),
                         ),
                     )
+                } else {
                     Text(
-                        text = ">> ${freq.name} <<",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 10.sp,
-                            color = GarlemaldColors.ImperialRedGlow,
-                        ),
-                    )
-                }
-            } else {
-                Column {
-                    Text(
-                        text = "UNITÉ MAGITEK — TÉLÉCOMMANDE v3.7",
-                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 10.sp),
-                    )
-                    Text(
-                        text = "GLOIRE A L'EMPIRE",
+                        text  = "UNITÉ MAGITEK — TÉLÉCOMMANDE v3.7",
                         style = MaterialTheme.typography.titleMedium.copy(fontSize = 10.sp),
                     )
                 }
             }
+            if (locationName != null) {
+                Text(
+                    text  = "LOC: $locationName",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontSize = 7.sp,
+                        color    = GarlemaldColors.ScreenGreenDim,
+                    ),
+                )
+            }
         }
 
-        // Diode — fixe si fréquence active, clignotante sinon
-        /*if (activeFrequency != null) {
-            DiodeFixed()
-        } else {
-            DiodeIndicator()
-        }*/
+        // Diode — vitesse de pulse proportionnelle au niveau
         when {
-            glitchEngine.diodeFlicker -> DiodeGlitch()
-            activeFrequency != null -> DiodeFixed()
-            else -> DiodeIndicator()
+            glitchEngine.diodeFlicker          -> DiodeGlitch()
+            resonanceLevel?.isComplete == true -> DiodeFixed()
+            resonanceLevel != null             -> DiodePulsing(speed = resonanceLevel.level)
+            else                               -> DiodeIndicator()
         }
+
+        Spacer(Modifier.width(8.dp))
+
+     /*   Text(
+            text     = "⚙",
+            style    = MaterialTheme.typography.labelLarge.copy(
+                color    = GarlemaldColors.MetalLight,
+                fontSize = 16.sp,
+            ),
+            modifier = Modifier.clickable(onClick = onSettingsClick).padding(4.dp),
+        )*/
     }
+}
+
+// Diode pulsante dont la vitesse augmente avec le niveau
+@Composable
+fun DiodePulsing(speed: Float) {
+    val durationMs = (800f - speed * 600f).toInt().coerceIn(200, 800)  // 800ms lent → 200ms rapide
+    val infiniteTransition = rememberInfiniteTransition(label = "diode_pulse")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue  = 0.2f,
+        targetValue   = speed.coerceAtLeast(0.4f),
+        animationSpec = infiniteRepeatable(
+            animation  = tween(durationMs, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "diode_pulse_alpha",
+    )
+    Box(
+        modifier = Modifier
+            .size(10.dp)
+            .background(
+                GarlemaldColors.DiodRed.copy(alpha = alpha),
+                androidx.compose.foundation.shape.RoundedCornerShape(50),
+            )
+            .border(
+                1.dp,
+                GarlemaldColors.ImperialRedGlow.copy(alpha = alpha * 0.5f),
+                androidx.compose.foundation.shape.RoundedCornerShape(50),
+            ),
+    )
 }
 
 /** Diode en mode glitch — scintille de façon erratique */
