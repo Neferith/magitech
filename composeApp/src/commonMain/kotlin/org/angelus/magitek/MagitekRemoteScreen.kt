@@ -31,6 +31,7 @@ import org.angelus.magitek.model.ButtonAssignment
 import org.angelus.magitek.model.ButtonConfig
 import org.angelus.magitek.model.ButtonLabelEncoder
 import org.angelus.magitek.model.CommandSpec
+import org.angelus.magitek.model.EditModeController
 import org.angelus.magitek.model.HiddenMessageEngine
 import org.angelus.magitek.model.HiddenState
 import org.angelus.magitek.model.buildActivationFrequencies
@@ -54,24 +55,29 @@ import kotlin.random.Random
 // ── État d'un bouton ──────────────────────────────────────────────────────────
 
 data class ButtonState(
-    val index      : Int,
-    val config     : ButtonConfig?,   // null = non assigné
+    val index: Int,
+    val config: ButtonConfig?,   // null = non assigné
 )
 
 // ── Écran principal ───────────────────────────────────────────────────────────
 
 @Composable
-fun MagitekRemoteScreen() {
+fun MagitekRemoteScreen(
+    editModeController: EditModeController,
+    isEditMode: Boolean,
+    screenLog: List<String>,
+    onScreenLogChange: (List<String>) -> Unit,
+) {
 
     val repository = rememberButtonRepository()
-    val feedback   = rememberFeedbackController()
-    val scope      = rememberCoroutineScope()
+    val feedback = rememberFeedbackController()
+    val scope = rememberCoroutineScope()
 
     val staticHum = rememberStaticHumPlayer()
 
     val glitchEngine = rememberGlitchEngine()
     val appSettings = rememberMagitekSettings()
-    val locations   = remember { buildLocations() }
+    val locations = remember { buildLocations() }
     val currentLocation by remember(appSettings.locationId) {
         derivedStateOf { locations.findById(appSettings.locationId) }
     }
@@ -84,19 +90,18 @@ fun MagitekRemoteScreen() {
     var isDraggingDial by remember { mutableStateOf(false) }
 
 
-
 // C'est tout. Le son démarre automatiquement au lancement via LaunchedEffect
 // et s'arrête proprement au DisposableEffect.
 
 // Optionnel — si tu veux ajuster le volume dynamiquement :
- staticHum.volume = 0.009f  // encore plus discret
+    staticHum.volume = 0.009f  // encore plus discret
 // staticHum.volume = 0.08f  // un peu plus présent
 
     var runningMacroIndex by remember { mutableStateOf<Int?>(null) }
-    var runningMacroJob   by remember { mutableStateOf<Job?>(null) }
+    var runningMacroJob by remember { mutableStateOf<Job?>(null) }
 
     val hiddenEngine = remember { HiddenMessageEngine(buildDefaultSecrets()) }
-    var hiddenState  by remember { mutableStateOf<HiddenState>(HiddenState.Idle) }
+    var hiddenState by remember { mutableStateOf<HiddenState>(HiddenState.Idle) }
 
     // Chargement de la configuration persistée
     var buttonConfigs by remember {
@@ -106,18 +111,18 @@ fun MagitekRemoteScreen() {
         )
     }
     // Commande / log affiché sur l'écran terminal
-    var screenLog by remember { mutableStateOf<List<String>>(listOf("> ATTENTE COMMANDE...", "> _")) }
+    //  var screenLog by remember { mutableStateOf<List<String>>(listOf("> ATTENTE COMMANDE...", "> _")) }
 
     // Dialogs
     var editingButtonIndex by remember { mutableStateOf<Int?>(null) }   // appui long → assignation
-    var showAssignTypeFor  by remember { mutableStateOf<Int?>(null) }   // choix : commande ou macro
-    var showCommandPicker  by remember { mutableStateOf<Int?>(null) }
-    var showMacroPicker    by remember { mutableStateOf<Int?>(null) }
+    var showAssignTypeFor by remember { mutableStateOf<Int?>(null) }   // choix : commande ou macro
+    var showCommandPicker by remember { mutableStateOf<Int?>(null) }
+    var showMacroPicker by remember { mutableStateOf<Int?>(null) }
 
     var globalFrequency by remember { mutableStateOf(0L) }
 
-    val editModeController = remember { buildEditModeController() }
-    val isEditMode by remember { derivedStateOf { editModeController.isUnlocked } }
+    //val editModeController = remember { buildEditModeController() }
+    // val isEditMode by remember { derivedStateOf { editModeController.isUnlocked } }
 
     // Dispose feedback
     DisposableEffect(Unit) { onDispose { feedback.release() } }
@@ -185,14 +190,17 @@ fun MagitekRemoteScreen() {
     // ── Gestion d'une pression simple (exécution) ─────────────────────────────
     fun executeButton(index: Int) {
 
-        val modeChanged = editModeController.onButtonPressed(index, scope)
+        val wasEditMode = isEditMode
+        val modeChanged = editModeController.onButtonPressed(index, scope, isEditMode)
         if (modeChanged) {
-            screenLog = if (editModeController.isUnlocked) listOf(
-                "> MODE ÉDITION ACTIVÉ",
-                "> APPUI LONG POUR CONFIGURER",
-            ) else listOf(
-                "> MODE ÉDITION DÉSACTIVÉ",
-                "> _",
+            onScreenLogChange(
+                if (!wasEditMode) listOf(
+                    "> MODE ÉDITION ACTIVÉ",
+                    "> APPUI LONG POUR CONFIGURER",
+                ) else listOf(
+                    "> MODE ÉDITION DÉSACTIVÉ",
+                    "> _",
+                )
             )
             return  // on ne déclenche pas de commande sur la séquence de déverrouillage
         }
@@ -204,9 +212,11 @@ fun MagitekRemoteScreen() {
         val config = buttonConfigs[index]
 
         if (config == null) {
-            screenLog = listOf(
-                "> BTN-${index.toString().padStart(2, '0')}: NON ASSIGNÉ",
-                "> APPUI LONG POUR CONFIGURER",
+            onScreenLogChange(
+                listOf(
+                    "> BTN-${index.toString().padStart(2, '0')}: NON ASSIGNÉ",
+                    "> APPUI LONG POUR CONFIGURER",
+                )
             )
             return
         }
@@ -214,14 +224,19 @@ fun MagitekRemoteScreen() {
         when (val assignment = config.assignment) {
             is ButtonAssignment.SingleCommand -> {
                 feedback.triggerCommandFeedback()
-              //  val bits = assignment.command.encode64()
+                //  val bits = assignment.command.encode64()
                 val bits = assignment.command.encode64WithFreq(globalFrequency)
-                screenLog = listOfNotNull(
-                    "> CMD: ${/*assignment/*.command*/.displayLabel(config.customLabel)*/ButtonLabelEncoder.encode(config.buttonIndex)}",
-                    "> HEX: 0x${bits.toHex16()}",
-                    "> BIN: ${bits.toDisplayBin64()}",
-                    //"> ${assignment.command.displayDescription()}",
-                    if (isEditMode) "> ${assignment.command.displayDescription()}" else null,
+                onScreenLogChange(
+                    listOfNotNull(
+                        "> CMD: ${/*assignment/*.command*/.displayLabel(config.customLabel)*/ButtonLabelEncoder.encode(
+                            config.buttonIndex
+                        )
+                        }",
+                        "> HEX: 0x${bits.toHex16()}",
+                        "> BIN: ${bits.toDisplayBin64()}",
+                        //"> ${assignment.command.displayDescription()}",
+                        if (isEditMode) "> ${assignment.command.displayDescription()}" else null,
+                    )
                 )
             }
 
@@ -229,11 +244,13 @@ fun MagitekRemoteScreen() {
                 // Si cette macro est déjà en cours → on l'arrête
                 if (runningMacroIndex == index) {
                     runningMacroJob?.cancel()
-                    runningMacroJob   = null
+                    runningMacroJob = null
                     runningMacroIndex = null
-                    screenLog = listOf(
-                        "> MACRO: ${assignment.name}",
-                        "> ARRÊTÉE.",
+                    onScreenLogChange(
+                        listOf(
+                            "> MACRO: ${assignment.name}",
+                            "> ARRÊTÉE.",
+                        )
                     )
                     return
                 }
@@ -243,7 +260,7 @@ fun MagitekRemoteScreen() {
 
                 runningMacroIndex = index
                 runningMacroJob = scope.launch {
-                    screenLog = listOf("> MACRO: ${assignment.name}", "> EXÉCUTION...")
+                    onScreenLogChange(listOf("> MACRO: ${assignment.name}", "> EXÉCUTION..."))
                     try {
                         do {
                             assignment.steps.forEachIndexed { i, step ->
@@ -254,24 +271,32 @@ fun MagitekRemoteScreen() {
                                     "> CMD: ${step.command.shortLabel()}",
                                     "> HEX: 0x${bits.toHex16()}",
                                 )*/
-                                screenLog = listOf(
-                                    "> CMD: ${config.customLabel ?: "BTN-${index.toString().padStart(2, '0')}"}",
-                                    "> HEX: 0x${bits.toHex16()}",
-                                    "> BIN: ${bits.toDisplayBin64()}",
-                                    // description supprimée — uniquement en mode édition
-                                ) + if (isEditMode) listOf("> ${step.command.displayDescription()}") else emptyList()
+                                onScreenLogChange(
+                                    listOf(
+                                        "> CMD: ${
+                                            config.customLabel ?: "BTN-${
+                                                index.toString().padStart(2, '0')
+                                            }"
+                                        }",
+                                        "> HEX: 0x${bits.toHex16()}",
+                                        "> BIN: ${bits.toDisplayBin64()}",
+                                        // description supprimée — uniquement en mode édition
+                                    ) + if (isEditMode) listOf("> ${step.command.displayDescription()}") else emptyList()
+                                )
                                 feedback.triggerCommandFeedback()
                                 delay(step.delayAfterMs)
                             }
                         } while (assignment.loop)
 
-                        if (!assignment.loop) screenLog = listOf("> MACRO: ${assignment.name}", "> TERMINÉE.")
+                        if (!assignment.loop) {
+                            onScreenLogChange(listOf("> MACRO: ${assignment.name}", "> TERMINÉE."))
+                        }
                     } catch (_: CancellationException) {
                         // Annulation propre — screenLog déjà mis à jour
                     } finally {
                         if (runningMacroIndex == index) {
                             runningMacroIndex = null
-                            runningMacroJob   = null
+                            runningMacroJob = null
                         }
                     }
                 }
@@ -280,19 +305,19 @@ fun MagitekRemoteScreen() {
     }
 
     LifecycleEffect(
-        onPause  = { staticHum.stop() },
+        onPause = { staticHum.stop() },
         onResume = { staticHum.start(scope) },
     )
 
     GarlemaldTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = GarlemaldColors.Background) {
             Column(
-                modifier            = Modifier.fillMaxSize().padding(8.dp),
+                modifier = Modifier.fillMaxSize().padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ImperialHeader(
                     activeFrequency = activeFrequency,
-                            glitchEngine    = glitchEngine,
+                    glitchEngine = glitchEngine,
                 )
                 CommandScreen(
                     lines = screenLog,
@@ -302,21 +327,20 @@ fun MagitekRemoteScreen() {
                     isEditMode = isEditMode,
                 )
                 ButtonGrid(
-                    buttonConfigs    = buttonConfigs,
+                    buttonConfigs = buttonConfigs,
                     runningMacroIndex = runningMacroIndex,
-                    isEditMode        = isEditMode,
-                    glitchEngine    = glitchEngine,
-                    onTap            = { index -> executeButton(index) },
-                    onLongPress      = { index ->
+                    isEditMode = isEditMode,
+                    glitchEngine = glitchEngine,
+                    onTap = { index -> executeButton(index) },
+                    onLongPress = { index ->
                         editingButtonIndex = index;
                         if (isEditMode) showAssignTypeFor = index
-                                       },
-                    modifier         = Modifier.weight(1f),
+                    },
+                    modifier = Modifier.weight(1f),
                 )
                 FrequencyDial(
                     frequency = globalFrequency,
-                    onChange  = {
-                            freq ->
+                    onChange = { freq ->
                         globalFrequency = freq
                         val detected = activationFrequencies.detect(freq)
                         if (detected != activeFrequency) {
@@ -325,10 +349,10 @@ fun MagitekRemoteScreen() {
                                 feedback.triggerActivationSound()
                             }
                         }
-                                },
+                    },
                     onDragStart = { isDraggingDial = true },
-                    onDragEnd   = { isDraggingDial = false },
-                    onDetent    = { feedback.triggerDialClick() },
+                    onDragEnd = { isDraggingDial = false },
+                    onDetent = { feedback.triggerDialClick() },
                 )
                 StatusBar(frequency = globalFrequency)
             }
@@ -340,13 +364,13 @@ fun MagitekRemoteScreen() {
         AssignTypeDialog(
             currentConfig = buttonConfigs[idx],
             onSingleCommand = { showAssignTypeFor = null; showCommandPicker = idx },
-            onMacro         = { showAssignTypeFor = null; showMacroPicker   = idx },
-            onClear         = {
+            onMacro = { showAssignTypeFor = null; showMacroPicker = idx },
+            onClear = {
                 showAssignTypeFor = null
                 repository.deleteConfig(idx)
                 buttonConfigs = buttonConfigs.toMutableMap().also { it.remove(idx) }
             },
-            onDismiss       = { showAssignTypeFor = null },
+            onDismiss = { showAssignTypeFor = null },
         )
     }
 
@@ -354,12 +378,12 @@ fun MagitekRemoteScreen() {
     showCommandPicker?.let { idx ->
         val existing = (buttonConfigs[idx]?.assignment as? ButtonAssignment.SingleCommand)?.command
         CommandPickerDialog(
-            initial   = existing,
+            initial = existing,
             onConfirm = { spec ->
                 val config = ButtonConfig(
-                    buttonIndex  = idx,
-                    assignment   = ButtonAssignment.SingleCommand(spec),
-                    customLabel  = buttonConfigs[idx]?.customLabel,
+                    buttonIndex = idx,
+                    assignment = ButtonAssignment.SingleCommand(spec),
+                    customLabel = buttonConfigs[idx]?.customLabel,
                 )
                 repository.saveConfig(config)
                 buttonConfigs = buttonConfigs.toMutableMap().also { it[idx] = config }
@@ -373,11 +397,11 @@ fun MagitekRemoteScreen() {
     showMacroPicker?.let { idx ->
         val existing = buttonConfigs[idx]?.assignment as? ButtonAssignment.Macro
         MacroEditorDialog(
-            initial   = existing,
+            initial = existing,
             onConfirm = { macro ->
                 val config = ButtonConfig(
                     buttonIndex = idx,
-                    assignment  = macro,
+                    assignment = macro,
                     customLabel = macro.name,
                 )
                 repository.saveConfig(config)
@@ -393,15 +417,15 @@ fun MagitekRemoteScreen() {
 
 @Composable
 fun AssignTypeDialog(
-    currentConfig  : ButtonConfig?,
+    currentConfig: ButtonConfig?,
     onSingleCommand: () -> Unit,
-    onMacro        : () -> Unit,
-    onClear        : () -> Unit,
-    onDismiss      : () -> Unit,
+    onMacro: () -> Unit,
+    onClear: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor   = GarlemaldColors.Surface,
+        containerColor = GarlemaldColors.Surface,
         titleContentColor = GarlemaldColors.ImperialRed,
         title = {
             Text("ASSIGNER BOUTON", style = MaterialTheme.typography.titleMedium)
@@ -409,7 +433,7 @@ fun AssignTypeDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssignOption("COMMANDE SIMPLE", GarlemaldColors.ScreenGreen, onSingleCommand)
-                AssignOption("MACRO",           GarlemaldColors.MagitekBlue, onMacro)
+                AssignOption("MACRO", GarlemaldColors.MagitekBlue, onMacro)
                 if (currentConfig != null) {
                     AssignOption("EFFACER", GarlemaldColors.ImperialRed, onClear)
                 }
@@ -418,8 +442,8 @@ fun AssignTypeDialog(
         confirmButton = {},
         dismissButton = {
             Text(
-                text     = "ANNULER",
-                style    = MaterialTheme.typography.labelLarge.copy(
+                text = "ANNULER",
+                style = MaterialTheme.typography.labelLarge.copy(
                     color = GarlemaldColors.MetalLight, fontSize = 10.sp,
                 ),
                 modifier = Modifier.clickable(onClick = onDismiss).padding(8.dp),
@@ -439,7 +463,7 @@ private fun AssignOption(label: String, color: Color, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text  = label,
+            text = label,
             style = MaterialTheme.typography.labelLarge.copy(color = color, fontSize = 11.sp),
         )
     }
@@ -449,30 +473,30 @@ private fun AssignOption(label: String, color: Color, onClick: () -> Unit) {
 
 @Composable
 fun ButtonGrid(
-    buttonConfigs     : Map<Int, ButtonConfig>,
-    runningMacroIndex : Int?,
-    isEditMode        : Boolean,
-    glitchEngine      : GlitchEngine,
-    onTap             : (Int) -> Unit,
-    onLongPress       : (Int) -> Unit,
-    modifier          : Modifier = Modifier,
+    buttonConfigs: Map<Int, ButtonConfig>,
+    runningMacroIndex: Int?,
+    isEditMode: Boolean,
+    glitchEngine: GlitchEngine,
+    onTap: (Int) -> Unit,
+    onLongPress: (Int) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     LazyVerticalGrid(
-        columns               = GridCells.Fixed(8),
-        modifier              = modifier
+        columns = GridCells.Fixed(8),
+        modifier = modifier
             .fillMaxWidth()
             .offset(x = glitchEngine.gridShake.dp, y = 0.dp),  // ← tremblement
-        verticalArrangement   = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
-        contentPadding        = PaddingValues(2.dp),
+        contentPadding = PaddingValues(2.dp),
     ) {
         items(64) { index ->
             MagitekButton(
-                index       = index,
-                config      = buttonConfigs[index],
-                isRunning   = runningMacroIndex == index,
-                isEditMode  = isEditMode,
-                onTap       = { onTap(index) },
+                index = index,
+                config = buttonConfigs[index],
+                isRunning = runningMacroIndex == index,
+                isEditMode = isEditMode,
+                onTap = { onTap(index) },
                 onLongPress = { onLongPress(index) },
             )
         }
@@ -484,11 +508,11 @@ fun ButtonGrid(
 
 @Composable
 fun MagitekButton(
-    index      : Int,
-    config     : ButtonConfig?,
-    isRunning  : Boolean,
-    isEditMode : Boolean,
-    onTap      : () -> Unit,
+    index: Int,
+    config: ButtonConfig?,
+    isRunning: Boolean,
+    isEditMode: Boolean,
+    onTap: () -> Unit,
     onLongPress: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -497,38 +521,38 @@ fun MagitekButton(
 
     val infiniteTransition = rememberInfiniteTransition(label = "running_$index")
     val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue  = 0.4f,
-        targetValue   = 1f,
+        initialValue = 0.4f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation  = tween(500, easing = FastOutSlowInEasing),
+            animation = tween(500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "pulse_$index",
     )
 
-    val isMacro    = config?.assignment is ButtonAssignment.Macro
+    val isMacro = config?.assignment is ButtonAssignment.Macro
     val isAssigned = config != null
 
     val bgColor = when {
-        isPressed  -> GarlemaldColors.ImperialRedDark
-        isRunning  -> GarlemaldColors.MagitekBlueDim
-        isMacro    -> GarlemaldColors.MagitekBlueDim.copy(alpha = 0.5f)
+        isPressed -> GarlemaldColors.ImperialRedDark
+        isRunning -> GarlemaldColors.MagitekBlueDim
+        isMacro -> GarlemaldColors.MagitekBlueDim.copy(alpha = 0.5f)
         isAssigned -> GarlemaldColors.SurfaceVariant
         isEditMode -> GarlemaldColors.ScreenBackground   // non assigné en mode édition
-        else       -> GarlemaldColors.Background
+        else -> GarlemaldColors.Background
     }
     val borderColor = when {
-        isPressed  -> GarlemaldColors.ImperialRedGlow
-        isRunning  -> GarlemaldColors.MagitekBlue.copy(alpha = pulseAlpha)
-        isMacro    -> GarlemaldColors.MagitekBlue
+        isPressed -> GarlemaldColors.ImperialRedGlow
+        isRunning -> GarlemaldColors.MagitekBlue.copy(alpha = pulseAlpha)
+        isMacro -> GarlemaldColors.MagitekBlue
         isAssigned -> GarlemaldColors.Border
         isEditMode -> GarlemaldColors.ScreenGreenDim.copy(alpha = 0.4f)  // contour vert discret
-        else       -> GarlemaldColors.MetalDark.copy(alpha = 0.4f)
+        else -> GarlemaldColors.MetalDark.copy(alpha = 0.4f)
     }
     val textColor = when {
-        isPressed  -> GarlemaldColors.OnImperialRed
+        isPressed -> GarlemaldColors.OnImperialRed
         isAssigned -> GarlemaldColors.OnSurface
-        else       -> GarlemaldColors.MetalDark
+        else -> GarlemaldColors.MetalDark
     }
 
     val label = ButtonLabelEncoder.encode(index)/*config?.assignment?.displayLabel(config.customLabel)
@@ -548,10 +572,10 @@ fun MagitekButton(
                         val released = tryAwaitRelease()
                         scope.launch {
                             if (released) interactionSource.emit(PressInteraction.Release(press))
-                            else          interactionSource.emit(PressInteraction.Cancel(press))
+                            else interactionSource.emit(PressInteraction.Cancel(press))
                         }
                     },
-                    onTap       = { onTap() },
+                    onTap = { onTap() },
                     onLongPress = { onLongPress() },
                 )
             }
@@ -567,23 +591,23 @@ fun MagitekButton(
         )
         if (isRunning) {
             Text(
-                text  = "■",
+                text = "■",
                 style = MaterialTheme.typography.labelLarge.copy(
-                    color    = GarlemaldColors.MagitekBlue.copy(alpha = pulseAlpha),
+                    color = GarlemaldColors.MagitekBlue.copy(alpha = pulseAlpha),
                     fontSize = 10.sp,
                 ),
                 textAlign = TextAlign.Center,
             )
         } else {
             Text(
-                text      = label,
-                style     = MaterialTheme.typography.labelLarge.copy(
-                    color    = textColor,
+                text = label,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    color = textColor,
                     fontSize = 7.sp,
                 ),
                 textAlign = TextAlign.Center,
-                maxLines  = 1,
-                overflow  = TextOverflow.Clip,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
             )
         }
     }
@@ -593,14 +617,14 @@ fun MagitekButton(
 
 @Composable
 fun CommandScreen(
-    lines          : List<String>,
-    hiddenState    : HiddenState,
-    isEditMode        : Boolean,
+    lines: List<String>,
+    hiddenState: HiddenState,
+    isEditMode: Boolean,
     activeFrequency: ActivationFrequency? = null,
-    glitchEngine   : GlitchEngine,
+    glitchEngine: GlitchEngine,
 ) {
     val displayLines = glitchEngine.corruptedLines ?: lines
-    val shift        = glitchEngine.scanlineShift
+    val shift = glitchEngine.scanlineShift
 
     Box(
         modifier = Modifier
@@ -619,7 +643,7 @@ fun CommandScreen(
                 if (glitchEngine.flashIntensity > 0f) {
                     drawRect(
                         color = GarlemaldColors.ScreenGreen.copy(alpha = glitchEngine.flashIntensity),
-                        size  = size,
+                        size = size,
                         blendMode = BlendMode.Difference,
                     )
                 }
@@ -631,15 +655,16 @@ fun CommandScreen(
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             displayLines.forEachIndexed { i, line ->
-                val displayLine = if (i == 2 && line.startsWith("> BIN:") && glitchEngine.corruptedLines == null) {
-                    injectHiddenBits(line, hiddenState)
-                } else line
+                val displayLine =
+                    if (i == 2 && line.startsWith("> BIN:") && glitchEngine.corruptedLines == null) {
+                        injectHiddenBits(line, hiddenState)
+                    } else line
 
                 Text(
-                    text  = displayLine,
+                    text = displayLine,
                     style = MaterialTheme.typography.displayMedium.copy(
                         fontSize = if (i == 0) 11.sp else 9.sp,
-                        color    = if (glitchEngine.corruptedLines != null)
+                        color = if (glitchEngine.corruptedLines != null)
                             GarlemaldColors.ScreenGreen.copy(alpha = 0.7f)
                         else lineColor(i, hiddenState),
                     ),
@@ -649,10 +674,10 @@ fun CommandScreen(
             }
             if (isEditMode && hiddenState is HiddenState.Complete) {
                 Text(
-                    text  = "> !! ${hiddenState.fullMessage} !!",
+                    text = "> !! ${hiddenState.fullMessage} !!",
                     style = MaterialTheme.typography.displayMedium.copy(
-                        fontSize      = 11.sp,
-                        color         = GarlemaldColors.ImperialRedGlow,
+                        fontSize = 11.sp,
+                        color = GarlemaldColors.ImperialRedGlow,
                         letterSpacing = 3.sp,
                     ),
                     maxLines = 1,
@@ -661,10 +686,10 @@ fun CommandScreen(
         }
         if (activeFrequency != null) {
             Text(
-                text     = "◆ SYNC",
-                style    = MaterialTheme.typography.displayMedium.copy(
+                text = "◆ SYNC",
+                style = MaterialTheme.typography.displayMedium.copy(
                     fontSize = 9.sp,
-                    color    = GarlemaldColors.ImperialRed,
+                    color = GarlemaldColors.ImperialRed,
                 ),
                 modifier = Modifier.align(Alignment.BottomEnd),
             )
@@ -681,9 +706,9 @@ fun drawScanlines(scope: DrawScope, offsetX: Float = 0f) {
     var y = 0f
     while (y < scope.size.height) {
         scope.drawLine(
-            color       = lineColor,
-            start       = Offset(offsetX, y),
-            end         = Offset(scope.size.width + offsetX, y),
+            color = lineColor,
+            start = Offset(offsetX, y),
+            end = Offset(scope.size.width + offsetX, y),
             strokeWidth = 1.5f,
         )
         y += 4f
@@ -693,7 +718,7 @@ fun drawScanlines(scope: DrawScope, offsetX: Float = 0f) {
 // ── En-tête ───────────────────────────────────────────────────────────────────
 
 @Composable
-fun ImperialHeader(activeFrequency: ActivationFrequency? = null, glitchEngine    : GlitchEngine) {
+fun ImperialHeader(activeFrequency: ActivationFrequency? = null, glitchEngine: GlitchEngine) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -705,24 +730,24 @@ fun ImperialHeader(activeFrequency: ActivationFrequency? = null, glitchEngine   
             )
             .padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment     = Alignment.CenterVertically,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         // Titre — remplacé par le nom de la fréquence si active
         Crossfade(targetState = activeFrequency, label = "header_title") { freq ->
             if (freq != null) {
                 Column {
-                Text(
-                    text  = ">> RÉSONNANCE DÉTECTÉE : <<",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontSize = 10.sp,
-                        color    = GarlemaldColors.ImperialRedGlow,
-                    ),
-                )
                     Text(
-                        text  = ">> ${freq.name} <<",
+                        text = ">> RÉSONNANCE DÉTECTÉE : <<",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontSize = 10.sp,
-                            color    = GarlemaldColors.ImperialRedGlow,
+                            color = GarlemaldColors.ImperialRedGlow,
+                        ),
+                    )
+                    Text(
+                        text = ">> ${freq.name} <<",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 10.sp,
+                            color = GarlemaldColors.ImperialRedGlow,
                         ),
                     )
                 }
@@ -748,8 +773,8 @@ fun ImperialHeader(activeFrequency: ActivationFrequency? = null, glitchEngine   
         }*/
         when {
             glitchEngine.diodeFlicker -> DiodeGlitch()
-            activeFrequency != null   -> DiodeFixed()
-            else                      -> DiodeIndicator()
+            activeFrequency != null -> DiodeFixed()
+            else -> DiodeIndicator()
         }
     }
 }
@@ -759,10 +784,10 @@ fun ImperialHeader(activeFrequency: ActivationFrequency? = null, glitchEngine   
 fun DiodeGlitch() {
     val infiniteTransition = rememberInfiniteTransition(label = "diode_glitch")
     val alpha by infiniteTransition.animateFloat(
-        initialValue  = 0f,
-        targetValue   = 1f,
+        initialValue = 0f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation  = tween(50, easing = LinearEasing),
+            animation = tween(50, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "diode_glitch_alpha",
@@ -788,8 +813,15 @@ fun DiodeFixed() {
     Box(
         modifier = Modifier
             .size(10.dp)
-            .background(GarlemaldColors.DiodRed, androidx.compose.foundation.shape.RoundedCornerShape(50))
-            .border(1.dp, GarlemaldColors.ImperialRedGlow, androidx.compose.foundation.shape.RoundedCornerShape(50)),
+            .background(
+                GarlemaldColors.DiodRed,
+                androidx.compose.foundation.shape.RoundedCornerShape(50)
+            )
+            .border(
+                1.dp,
+                GarlemaldColors.ImperialRedGlow,
+                androidx.compose.foundation.shape.RoundedCornerShape(50)
+            ),
     )
 }
 
@@ -798,10 +830,10 @@ fun DiodeFixed() {
 fun DiodeIndicator() {
     val infiniteTransition = rememberInfiniteTransition(label = "diode")
     val alpha by infiniteTransition.animateFloat(
-        initialValue  = 0.3f,
-        targetValue   = 1f,
+        initialValue = 0.3f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation  = tween(800, easing = FastOutSlowInEasing),
+            animation = tween(800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "diode_alpha",
@@ -827,7 +859,7 @@ fun StatusBar(frequency: Long) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         listOf(
-            "FREQ: ${frequency.toString(16).uppercase().padStart(5,'0')}",
+            "FREQ: ${frequency.toString(16).uppercase().padStart(5, '0')}",
             "CONN: ---",
             "PROXIM: ---",
             "MODE: CTL",
@@ -858,8 +890,8 @@ fun drawScanlines(scope: DrawScope) {
 private fun injectHiddenBits(line: String, state: HiddenState): String {
     val bits34 = when (state) {
         is HiddenState.Revealing -> state.bits34
-        is HiddenState.Complete  -> state.bits34
-        else                     -> return line
+        is HiddenState.Complete -> state.bits34
+        else -> return line
     }
     val sepIndex = line.lastIndexOf("| ")
     if (sepIndex < 0) return line
@@ -873,9 +905,9 @@ private fun injectHiddenBits(line: String, state: HiddenState): String {
 private fun lineColor(lineIndex: Int, state: HiddenState): Color = when {
     // La ligne BIN pulse en bleu magitek quand une séquence est en cours
     lineIndex == 2 && state is HiddenState.Revealing -> GarlemaldColors.MagitekBlue
-    lineIndex == 2 && state is HiddenState.Complete  -> GarlemaldColors.ImperialRedGlow
-    lineIndex == 0                                   -> GarlemaldColors.ScreenGreen
-    else                                             -> GarlemaldColors.ScreenGreenDim
+    lineIndex == 2 && state is HiddenState.Complete -> GarlemaldColors.ImperialRedGlow
+    lineIndex == 0 -> GarlemaldColors.ScreenGreen
+    else -> GarlemaldColors.ScreenGreenDim
 }
 
 fun CommandSpec.encode64WithFreq(freq: Long): Long {

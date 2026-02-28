@@ -2,31 +2,26 @@
 
 package org.angelus.magitek.model
 
-import androidx.compose.runtime.*
 import kotlinx.coroutines.*
 
-/**
- * Contrôle le mode édition.
- * Déverrouillé par une séquence secrète de boutons.
- * Se reverrouille automatiquement après inactivité.
- */
 class EditModeController(
-    private val unlockSequence : List<Int>,     // séquence secrète
-    private val lockSequence   : List<Int> = emptyList(), // séquence pour reverrouiller manuellement
-    private val timeoutMs      : Long = 60_000L, // timeout inactivité (1 min par défaut)
+    private val unlockSequence : List<Int>,
+    private val lockSequence   : List<Int> = emptyList(),
+    private val timeoutMs      : Long = 120_000L,
+    private val onUnlock       : () -> Unit = {},
+    private val onLock         : () -> Unit = {},
+    private val onTimeout: () -> Unit = {},
 ) {
-    var isUnlocked by mutableStateOf(false)
-        private set
-
     private var progress     = 0
     private var lockProgress = 0
     private var timeoutJob: Job? = null
+
 
     /**
      * Appelé à chaque pression de bouton.
      * Retourne true si le mode vient de changer.
      */
-    fun onButtonPressed(buttonIndex: Int, scope: CoroutineScope): Boolean {
+    fun onButtonPressed(buttonIndex: Int, scope: CoroutineScope, isUnlocked: Boolean): Boolean {
         if (isUnlocked) {
             // Réinitialise le timeout à chaque interaction
             resetTimeout(scope)
@@ -61,18 +56,19 @@ class EditModeController(
     }
 
     private fun unlock(scope: CoroutineScope) {
-        isUnlocked   = true
-        progress      = 0
-        lockProgress  = 0
+        progress     = 0
+        lockProgress = 0
+        onUnlock()
         resetTimeout(scope)
     }
 
     private fun lock() {
-        isUnlocked   = false
-        progress      = 0
-        lockProgress  = 0
+        progress     = 0
+        lockProgress = 0
         timeoutJob?.cancel()
-        timeoutJob    = null
+        timeoutJob   = null
+        onLock()
+        onTimeout()   // ← appelé uniquement au timeout
     }
 
     private fun resetTimeout(scope: CoroutineScope) {
@@ -87,10 +83,15 @@ class EditModeController(
     fun forceLock()                         = lock()
 }
 
-// Séquence secrète hardcodée — à changer avant distribution !
-// Exemple : boutons 0, 7, 3, 15, 8  (indices dans la grille)
-fun buildEditModeController() = EditModeController(
+fun buildEditModeController(
+    onUnlock: () -> Unit = {},
+    onLock  : () -> Unit = {},
+    onTimeout: () -> Unit = {},
+) = EditModeController(
     unlockSequence = listOf(0, 7, 3, 15, 8),
-    lockSequence   = listOf(0, 7),            // séquence courte pour reverrouiller
-    timeoutMs      = 120_000L,                // 2 minutes
+    lockSequence   = listOf(0, 7),
+    timeoutMs      = 240_000L,
+    onUnlock       = onUnlock,
+    onLock         = onLock,
+    onTimeout      = onTimeout,
 )
