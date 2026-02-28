@@ -44,6 +44,8 @@ import org.angelus.magitek.model.findById
 import org.angelus.magitek.repository.rememberButtonRepository
 import org.angelus.magitek.settings.rememberMagitekSettings
 import org.angelus.magitek.ui.FrequencyDial
+import org.angelus.magitek.ui.GlitchEngine
+import org.angelus.magitek.ui.rememberGlitchEngine
 import kotlin.random.Random
 
 // ── État d'un bouton ──────────────────────────────────────────────────────────
@@ -64,6 +66,7 @@ fun MagitekRemoteScreen() {
 
     val staticHum = rememberStaticHumPlayer()
 
+    val glitchEngine = rememberGlitchEngine()
     val appSettings = rememberMagitekSettings()
     val locations   = remember { buildLocations() }
     val currentLocation by remember(appSettings.locationId) {
@@ -77,29 +80,7 @@ fun MagitekRemoteScreen() {
 
     var isDraggingDial by remember { mutableStateOf(false) }
 
-    LaunchedEffect(appSettings.humVolume) {
-        if (!isDraggingDial && activeFrequency == null) {
-            val target = appSettings.humVolume / 100f * 0.3f  // 0..0.3
-            staticHum.volume = target
-        }
-    }
 
-    LaunchedEffect(appSettings.randomVibration) {
-        if (appSettings.randomVibration) {
-            while (true) {
-                delay(Random.nextLong(4_000L, 20_000L))
-                feedback.triggerRandomVibration()
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            // Intervalle aléatoire entre 6 et 30 secondes
-            delay(Random.nextLong(6_000L, 15_000L))
-            feedback.triggerGlitchSound()
-        }
-    }
 
 // C'est tout. Le son démarre automatiquement au lancement via LaunchedEffect
 // et s'arrête proprement au DisposableEffect.
@@ -142,6 +123,31 @@ fun MagitekRemoteScreen() {
             feedback.triggerRandomVibration()
         }
     }*/
+
+    LaunchedEffect(appSettings.humVolume) {
+        if (!isDraggingDial && activeFrequency == null) {
+            val target = appSettings.humVolume / 100f * 0.3f  // 0..0.3
+            staticHum.volume = target
+        }
+    }
+
+    LaunchedEffect(appSettings.randomVibration) {
+        if (appSettings.randomVibration) {
+            while (true) {
+                delay(Random.nextLong(4_000L, 20_000L))
+                glitchEngine.triggerGlitch(this, screenLog)
+                feedback.triggerRandomVibration()
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            // Intervalle aléatoire entre 6 et 30 secondes
+            delay(Random.nextLong(6_000L, 15_000L))
+            feedback.triggerGlitchSound()
+        }
+    }
 
     LaunchedEffect(isDraggingDial, activeFrequency) {
         if (isDraggingDial) {
@@ -253,11 +259,20 @@ fun MagitekRemoteScreen() {
                 modifier            = Modifier.fillMaxSize().padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                ImperialHeader(activeFrequency = activeFrequency)
-                CommandScreen(lines = screenLog, hiddenState = hiddenState, activeFrequency = activeFrequency)
+                ImperialHeader(
+                    activeFrequency = activeFrequency,
+                            glitchEngine    = glitchEngine,
+                )
+                CommandScreen(
+                    lines = screenLog,
+                    hiddenState = hiddenState,
+                    activeFrequency = activeFrequency,
+                    glitchEngine    = glitchEngine,
+                )
                 ButtonGrid(
                     buttonConfigs    = buttonConfigs,
                     runningMacroIndex = runningMacroIndex,
+                    glitchEngine    = glitchEngine,
                     onTap            = { index -> executeButton(index) },
                     onLongPress      = { index -> editingButtonIndex = index; showAssignTypeFor = index },
                     modifier         = Modifier.weight(1f),
@@ -399,13 +414,16 @@ private fun AssignOption(label: String, color: Color, onClick: () -> Unit) {
 fun ButtonGrid(
     buttonConfigs     : Map<Int, ButtonConfig>,
     runningMacroIndex : Int?,
+    glitchEngine      : GlitchEngine,
     onTap             : (Int) -> Unit,
     onLongPress       : (Int) -> Unit,
     modifier          : Modifier = Modifier,
 ) {
     LazyVerticalGrid(
         columns               = GridCells.Fixed(8),
-        modifier              = modifier.fillMaxWidth(),
+        modifier              = modifier
+            .fillMaxWidth()
+            .offset(x = glitchEngine.gridShake.dp, y = 0.dp),  // ← tremblement
         verticalArrangement   = Arrangement.spacedBy(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         contentPadding        = PaddingValues(2.dp),
@@ -536,7 +554,11 @@ fun CommandScreen(
     lines          : List<String>,
     hiddenState    : HiddenState,
     activeFrequency: ActivationFrequency? = null,
+    glitchEngine   : GlitchEngine,
 ) {
+    val displayLines = glitchEngine.corruptedLines ?: lines
+    val shift        = glitchEngine.scanlineShift
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -547,12 +569,26 @@ fun CommandScreen(
                 color = if (activeFrequency != null) GarlemaldColors.ImperialRed
                 else GarlemaldColors.ScreenGreenDim,
             )
-            .drawBehind { drawScanlines(this) }
+            .drawBehind {
+                // Scanlines avec shift
+                drawScanlines(this, offsetX = shift)
+                // Flash d'inversion
+                if (glitchEngine.flashIntensity > 0f) {
+                    drawRect(
+                        color = GarlemaldColors.ScreenGreen.copy(alpha = glitchEngine.flashIntensity),
+                        size  = size,
+                        blendMode = BlendMode.Difference,
+                    )
+                }
+            }
             .padding(10.dp),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            lines.forEachIndexed { i, line ->
-                val displayLine = if (i == 2 && line.startsWith("> BIN:")) {
+        Column(
+            modifier = Modifier.offset(x = shift.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            displayLines.forEachIndexed { i, line ->
+                val displayLine = if (i == 2 && line.startsWith("> BIN:") && glitchEngine.corruptedLines == null) {
                     injectHiddenBits(line, hiddenState)
                 } else line
 
@@ -560,13 +596,14 @@ fun CommandScreen(
                     text  = displayLine,
                     style = MaterialTheme.typography.displayMedium.copy(
                         fontSize = if (i == 0) 11.sp else 9.sp,
-                        color    = lineColor(i, hiddenState),
+                        color    = if (glitchEngine.corruptedLines != null)
+                            GarlemaldColors.ScreenGreen.copy(alpha = 0.7f)
+                        else lineColor(i, hiddenState),
                     ),
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Clip,
                 )
             }
-
             if (hiddenState is HiddenState.Complete) {
                 Text(
                     text  = "> !! ${hiddenState.fullMessage} !!",
@@ -579,8 +616,6 @@ fun CommandScreen(
                 )
             }
         }
-
-        // Indicateur fréquence active en bas à droite de l'écran
         if (activeFrequency != null) {
             Text(
                 text     = "◆ SYNC",
@@ -594,10 +629,28 @@ fun CommandScreen(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// drawScanlines mis à jour avec offsetX
+// ─────────────────────────────────────────────────────────────────────────────
+
+fun drawScanlines(scope: DrawScope, offsetX: Float = 0f) {
+    val lineColor = Color(0x0A00FF88)
+    var y = 0f
+    while (y < scope.size.height) {
+        scope.drawLine(
+            color       = lineColor,
+            start       = Offset(offsetX, y),
+            end         = Offset(scope.size.width + offsetX, y),
+            strokeWidth = 1.5f,
+        )
+        y += 4f
+    }
+}
+
 // ── En-tête ───────────────────────────────────────────────────────────────────
 
 @Composable
-fun ImperialHeader(activeFrequency: ActivationFrequency? = null) {
+fun ImperialHeader(activeFrequency: ActivationFrequency? = null, glitchEngine    : GlitchEngine) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -645,12 +698,45 @@ fun ImperialHeader(activeFrequency: ActivationFrequency? = null) {
         }
 
         // Diode — fixe si fréquence active, clignotante sinon
-        if (activeFrequency != null) {
+        /*if (activeFrequency != null) {
             DiodeFixed()
         } else {
             DiodeIndicator()
+        }*/
+        when {
+            glitchEngine.diodeFlicker -> DiodeGlitch()
+            activeFrequency != null   -> DiodeFixed()
+            else                      -> DiodeIndicator()
         }
     }
+}
+
+/** Diode en mode glitch — scintille de façon erratique */
+@Composable
+fun DiodeGlitch() {
+    val infiniteTransition = rememberInfiniteTransition(label = "diode_glitch")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue  = 0f,
+        targetValue   = 1f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(50, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "diode_glitch_alpha",
+    )
+    Box(
+        modifier = Modifier
+            .size(10.dp)
+            .background(
+                GarlemaldColors.DiodRed.copy(alpha = alpha),
+                androidx.compose.foundation.shape.RoundedCornerShape(50),
+            )
+            .border(
+                1.dp,
+                GarlemaldColors.MagitekBlue.copy(alpha = 1f - alpha),
+                androidx.compose.foundation.shape.RoundedCornerShape(50),
+            ),
+    )
 }
 
 // Diode fixe (pas d'animation) pour fréquence verrouillée
