@@ -27,6 +27,16 @@ actual fun rememberMagitekSettings(): MagitekSettings {
     return settings
 }
 
+// Contexte global pour saveFrequency (initialisé dans MainActivity)
+lateinit var appContext: Context
+
+actual fun saveFrequency(frequency: Long) {
+    appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        .edit()
+        .putLong(PREF_LAST_FREQUENCY, frequency)
+        .apply()
+}
+
 // Note : EditTextPreference stocke en String — adapter toSettings() :
 private fun SharedPreferences.toSettings() = MagitekSettings(
     locationId      = getString(PREF_LOCATION_ID, "NONE") ?: "NONE",
@@ -34,11 +44,21 @@ private fun SharedPreferences.toSettings() = MagitekSettings(
     currentY        = getString(PREF_CURRENT_Y, "0")?.toFloatOrNull() ?: 0f,
     randomVibration = getBoolean(PREF_RANDOM_VIBRATION, true),
     humVolume       = getInt(PREF_HUM_VOLUME, 4),
+    lastFrequency = getLong(PREF_LAST_FREQUENCY, 0L),
 )
+
+fun saveFrequency(context: Context, frequency: Long) {
+    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        .edit()
+        .putLong(PREF_LAST_FREQUENCY, frequency)
+        .apply()
+}
 
 // Ajouter les constantes :
 const val PREF_CURRENT_X = "current_x"
 const val PREF_CURRENT_Y = "current_y"
+
+const val PREF_LAST_FREQUENCY = "last_frequency"
 
 const val PREFS_NAME            = "magitek_settings"
 const val PREF_LOCATION_ID      = "location_id"

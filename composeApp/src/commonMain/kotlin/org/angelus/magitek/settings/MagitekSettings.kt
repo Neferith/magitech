@@ -10,7 +10,10 @@ data class MagitekSettings(
     val currentY        : Float   = 0f,     // ← nouveau
     val randomVibration : Boolean = true,
     val humVolume       : Int     = 4,
+    val lastFrequency   : Long    = 0L,    // ← nouveau
 )
 
 @Composable
 expect fun rememberMagitekSettings(): MagitekSettings
+
+expect fun saveFrequency(frequency: Long)

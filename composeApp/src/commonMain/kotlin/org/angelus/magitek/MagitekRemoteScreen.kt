@@ -47,6 +47,7 @@ import org.angelus.magitek.model.displayLabel
 import org.angelus.magitek.model.findById
 import org.angelus.magitek.repository.rememberButtonRepository
 import org.angelus.magitek.settings.rememberMagitekSettings
+import org.angelus.magitek.settings.saveFrequency
 import org.angelus.magitek.ui.FrequencyDial
 import org.angelus.magitek.ui.GlitchEngine
 import org.angelus.magitek.ui.LifecycleEffect
@@ -68,6 +69,8 @@ fun MagitekRemoteScreen(
     isEditMode: Boolean,
     screenLog: List<String>,
     onScreenLogChange: (List<String>) -> Unit,
+    globalFrequency: Long,
+    onGlobalFrequencyChange: (Long) -> Unit,
 ) {
 
     val repository = rememberButtonRepository()
@@ -120,7 +123,10 @@ fun MagitekRemoteScreen(
     var showCommandPicker by remember { mutableStateOf<Int?>(null) }
     var showMacroPicker by remember { mutableStateOf<Int?>(null) }
 
-    var globalFrequency by remember { mutableStateOf(0L) }
+
+    val globalFrequencyRef = rememberUpdatedState(globalFrequency)
+
+    //var globalFrequency by remember { mutableStateOf(0L) }
 
     //val editModeController = remember { buildEditModeController() }
     // val isEditMode by remember { derivedStateOf { editModeController.isUnlocked } }
@@ -371,7 +377,8 @@ fun MagitekRemoteScreen(
                                 feedback.triggerActivationSound()
                             }
                         }*/
-                        globalFrequency = freq
+                       // globalFrequency = freq
+                        onGlobalFrequencyChange(freq)
                         val detected = activationFrequencies.detectWithLevel(
                             frequency = freq,
                             currentX  = appSettings.currentX,
@@ -387,7 +394,10 @@ fun MagitekRemoteScreen(
 
                     },
                     onDragStart = { isDraggingDial = true },
-                    onDragEnd = { isDraggingDial = false },
+                    onDragEnd = {
+                        isDraggingDial = false
+                        saveFrequency(globalFrequencyRef.value)
+                                },
                     onDetent = { feedback.triggerDialClick() },
                 )
                 StatusBar(frequency = globalFrequency)

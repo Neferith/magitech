@@ -7,6 +7,7 @@ import org.angelus.magitek.model.buildEditModeController
 import org.angelus.magitek.platform.DeviceOrientation
 import org.angelus.magitek.platform.rememberDeviceOrientation
 import org.angelus.magitek.ui.BackOfRemoteScreen
+import org.angelus.magitek.settings.*
 
 @Composable
 @Preview
@@ -35,6 +36,14 @@ fun App() {
             }
         }
     }*/
+
+    val appSettings = rememberMagitekSettings()
+
+    // Initialisé une seule fois depuis la dernière fréquence sauvegardée
+    var globalFrequency by rememberSaveable {
+        mutableStateOf(appSettings.lastFrequency)
+    }
+
     val orientation = rememberDeviceOrientation()
 
     // rememberSaveable survit à la rotation
@@ -64,6 +73,11 @@ fun App() {
                 isEditMode         = isUnlocked,
                 screenLog          = screenLog,
                 onScreenLogChange  = { screenLog = it },
+                globalFrequency    = globalFrequency,
+                onGlobalFrequencyChange  = { freq ->
+                    globalFrequency = freq
+                   // saveFrequency(freq)
+                },
             )
         }
     }
