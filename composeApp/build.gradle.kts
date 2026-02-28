@@ -32,6 +32,7 @@ kotlin {
 
             implementation(project.dependencies.platform("com.google.firebase:firebase-bom:34.9.0"))
             implementation("com.google.firebase:firebase-analytics")
+            implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.0")
 
         }
         commonMain.dependencies {

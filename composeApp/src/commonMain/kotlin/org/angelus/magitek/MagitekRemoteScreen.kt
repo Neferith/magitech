@@ -46,6 +46,7 @@ import org.angelus.magitek.repository.rememberButtonRepository
 import org.angelus.magitek.settings.rememberMagitekSettings
 import org.angelus.magitek.ui.FrequencyDial
 import org.angelus.magitek.ui.GlitchEngine
+import org.angelus.magitek.ui.LifecycleEffect
 import org.angelus.magitek.ui.rememberGlitchEngine
 import kotlin.random.Random
 
@@ -276,6 +277,11 @@ fun MagitekRemoteScreen() {
             }
         }
     }
+
+    LifecycleEffect(
+        onPause  = { staticHum.stop() },
+        onResume = { staticHum.start(scope) },
+    )
 
     GarlemaldTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = GarlemaldColors.Background) {
