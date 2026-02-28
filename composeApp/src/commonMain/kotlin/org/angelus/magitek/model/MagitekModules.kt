@@ -182,12 +182,14 @@ data class ButtonConfig(
 
 // ── Helper label affiché sur le bouton ────────────────────────────────────────
 
-fun ButtonAssignment.displayLabel(customLabel: String?): String {
-    if (!customLabel.isNullOrBlank()) return customLabel
+fun ButtonConfig.displayLabel(customLabel: String?): String {
+    /*if (!customLabel.isNullOrBlank()) return customLabel
     return when (this) {
         is ButtonAssignment.SingleCommand -> command.shortLabel()
         is ButtonAssignment.Macro        -> name.take(8).uppercase()
-    }
+    }*/
+    return ButtonLabelEncoder.encode(this.buttonIndex)
+    //return buttonIndex
 }
 
 fun ButtonAssignment.displayDescription(): String = when (this) {

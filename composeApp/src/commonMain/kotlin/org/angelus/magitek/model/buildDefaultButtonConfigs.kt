@@ -8,7 +8,7 @@ package org.angelus.magitek.model
  */
 fun buildDefaultButtonConfigs(): Map<Int, ButtonConfig> {
 
-    data class Cmd(val mod: String, val sub: String, val act: String, val label: String)
+   /* data class Cmd(val mod: String, val sub: String, val act: String, val label: String)
 
     val defaults: List<Cmd> = listOf(
 
@@ -106,6 +106,52 @@ fun buildDefaultButtonConfigs(): Map<Int, ButtonConfig> {
                 )
             ),
             customLabel = label,
+        )
+    }.toMap()*/
+   data class Cmd(val mod: String, val sub: String, val act: String)
+
+    val defaults: List<Cmd> = listOf(
+        Cmd("0100", "0000", "0000"), Cmd("0100", "0000", "0010"),
+        Cmd("0100", "0001", "0000"), Cmd("0100", "0001", "0010"),
+        Cmd("0100", "0010", "0000"), Cmd("0100", "0010", "0010"),
+        Cmd("0100", "0011", "0000"), Cmd("0100", "1101", "0000"),
+        Cmd("0100", "1110", "0000"), Cmd("0100", "1111", "0000"),
+        Cmd("0100", "0110", "0000"), Cmd("0100", "1010", "0110"),
+        Cmd("1001", "0000", "0000"), Cmd("1001", "0000", "0001"),
+        Cmd("1001", "0100", "0000"), Cmd("1001", "0011", "0000"),
+        Cmd("1100", "0000", "0000"), Cmd("1100", "0001", "0000"),
+        Cmd("1100", "0100", "0000"), Cmd("1100", "0101", "0000"),
+        Cmd("1100", "0010", "0000"), Cmd("1100", "0011", "0000"),
+        Cmd("1100", "0111", "0000"), Cmd("1100", "1000", "0000"),
+        Cmd("1011", "0000", "0000"), Cmd("1011", "0001", "0000"),
+        Cmd("1011", "0010", "0000"), Cmd("1011", "0011", "0000"),
+        Cmd("1011", "0100", "0000"), Cmd("1011", "0101", "0000"),
+        Cmd("1011", "0110", "0000"), Cmd("1011", "0111", "0000"),
+        Cmd("1010", "0000", "0000"), Cmd("1010", "0001", "0000"),
+        Cmd("1010", "0010", "0000"), Cmd("1010", "0011", "0000"),
+        Cmd("1010", "0100", "0000"), Cmd("1010", "0101", "0000"),
+        Cmd("1010", "0110", "0000"), Cmd("1010", "0111", "0000"),
+        Cmd("1000", "0000", "0000"), Cmd("1000", "0001", "0000"),
+        Cmd("1000", "0010", "0000"), Cmd("1000", "0110", "0010"),
+        Cmd("1000", "0111", "0000"), Cmd("1000", "0101", "0000"),
+        Cmd("1000", "1000", "0000"), Cmd("1000", "1001", "0000"),
+        Cmd("1101", "0000", "0000"), Cmd("1101", "0001", "0000"),
+        Cmd("1101", "0010", "0000"), Cmd("1101", "0011", "0000"),
+        Cmd("1101", "0100", "0000"), Cmd("1101", "0101", "0000"),
+        Cmd("1101", "1000", "0000"), Cmd("1101", "0110", "0000"),
+        Cmd("1110", "0000", "0000"), Cmd("1110", "0001", "0000"),
+        Cmd("1110", "0010", "0000"), Cmd("1110", "0011", "0000"),
+        Cmd("1111", "0000", "0000"), Cmd("1111", "0001", "0000"),
+        Cmd("1111", "0010", "0000"), Cmd("1111", "0011", "0000"),
+    )
+
+    return defaults.mapIndexed { index, (mod, sub, act) ->
+        index to ButtonConfig(
+            buttonIndex = index,
+            assignment  = ButtonAssignment.SingleCommand(
+                CommandSpec(moduleCode = mod, submoduleCode = sub, actionCode = act)
+            ),
+            customLabel = ButtonLabelEncoder.encode(index),   // ← code encodé
         )
     }.toMap()
 }

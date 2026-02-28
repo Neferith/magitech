@@ -29,6 +29,7 @@ import org.angelus.magitek.audio.rememberStaticHumPlayer
 import org.angelus.magitek.model.ActivationFrequency
 import org.angelus.magitek.model.ButtonAssignment
 import org.angelus.magitek.model.ButtonConfig
+import org.angelus.magitek.model.ButtonLabelEncoder
 import org.angelus.magitek.model.CommandSpec
 import org.angelus.magitek.model.HiddenMessageEngine
 import org.angelus.magitek.model.HiddenState
@@ -216,7 +217,7 @@ fun MagitekRemoteScreen() {
               //  val bits = assignment.command.encode64()
                 val bits = assignment.command.encode64WithFreq(globalFrequency)
                 screenLog = listOfNotNull(
-                    "> CMD: ${assignment/*.command*/.displayLabel(config.customLabel)}",
+                    "> CMD: ${/*assignment/*.command*/.displayLabel(config.customLabel)*/ButtonLabelEncoder.encode(config.buttonIndex)}",
                     "> HEX: 0x${bits.toHex16()}",
                     "> BIN: ${bits.toDisplayBin64()}",
                     //"> ${assignment.command.displayDescription()}",
@@ -530,8 +531,8 @@ fun MagitekButton(
         else       -> GarlemaldColors.MetalDark
     }
 
-    val label = config?.assignment?.displayLabel(config.customLabel)
-        ?: index.toString().padStart(2, '0')
+    val label = ButtonLabelEncoder.encode(index)/*config?.assignment?.displayLabel(config.customLabel)
+        ?: index.toString().padStart(2, '0')*/
 
     Box(
         modifier = Modifier
