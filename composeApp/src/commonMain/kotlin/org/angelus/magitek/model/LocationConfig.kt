@@ -12,8 +12,15 @@ val ELEANOR_ARTEFACT_1 = "Artefact PK367TK"
 val ELEANOR_ARTEFACT_1_FREQ = 55000L
 val ELEANOR_ARTEFACT_2 = "Artefact PK368TK"
 val ELEANOR_ARTEFACT_2_FREQ = 5000L
-val ELEANOR_ARTEFACT_3 = "Artefact PK368TK"
+val ELEANOR_ARTEFACT_3 = "Artefact PK369TK"
+val ELEANOR_ARTEFACT_3_FREQ = 150000L
 
+val VIKTOR_ARTEFACT_1 = "Artefact ZR153LI"
+val VIKTOR_ARTEFACT_1_FREQ = 245000L
+val VIKTOR_ARTEFACT_2 = "Artefact ZR154LI"
+val VIKTOR_ARTEFACT_2_FREQ = 20000L
+val VIKTOR_ARTEFACT_3 = "Artefact ZR155LI"
+val VIKTOR_ARTEFACT_3_FREQ = 12000L
 fun buildLocations(): List<LocationConfig> = listOf(
     LocationConfig(
         id = "NONE",
@@ -21,27 +28,265 @@ fun buildLocations(): List<LocationConfig> = listOf(
         frequencies = emptyList(),
     ),
     LocationConfig(
+        id = "NOSCEA_CENTRAL",
+        name = "Noscea Central",
+        frequencies = listOf(
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_1,
+                target = VIKTOR_ARTEFACT_1_FREQ,
+                tolerance = 600L,
+                position = ResonancePosition(
+                    x = 25.6f,
+                    y = 17.0f,
+                    radius = 40.0f
+                ),
+               // maxLevel = 0.1f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_2,
+                target = VIKTOR_ARTEFACT_2_FREQ,
+                tolerance = 600L,
+                position = ResonancePosition(
+                    x = 25.6f,
+                    y = 17.0f,
+                    radius = 40.0f
+                ),
+              //  maxLevel = 0.1f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_3,
+                target = VIKTOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                position = ResonancePosition(
+                    x = 25.6f,
+                    y = 17.0f,
+                    radius = 40.0f
+                ),
+               // maxLevel = 0.1f
+            ),
+            ActivationFrequency(
+                name = ELEANOR_ARTEFACT_3,
+                target = ELEANOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.4f
+            ),
+        ),
+    ),
+    LocationConfig(
         id = "LIMSA",
         name = "Limsa Lominsa",
         frequencies = listOf(
-            ActivationFrequency(name = "ÉLÉONORE", target = 42000L, tolerance = 400L),
-            ActivationFrequency(name = "RÉSONNANCE", target = 131071L, tolerance = 600L),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_1,
+                target = VIKTOR_ARTEFACT_1_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.4f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_2,
+                target = VIKTOR_ARTEFACT_2_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.4f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_3,
+                target = VIKTOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.4f
+            ),
+            ActivationFrequency(
+                name = ELEANOR_ARTEFACT_3,
+                target = ELEANOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.4f
+            ),
         ),
     ),
     LocationConfig(
-        id = "GRIDANIA",
-        name = "Gridania",
+        id = "BASSE_NOSCEA",
+        name = "Basse Noscea",
         frequencies = listOf(
-            ActivationFrequency(name = "FLUX SYLVESTRE", target = 78000L, tolerance = 500L),
-            ActivationFrequency(name = "PROTOCOLE", target = 210000L, tolerance = 400L),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_1,
+                target = VIKTOR_ARTEFACT_1_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.38f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_2,
+                target = VIKTOR_ARTEFACT_2_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.38f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_3,
+                target = VIKTOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.38f
+            ),
+            ActivationFrequency(
+                name = ELEANOR_ARTEFACT_3,
+                target = ELEANOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                position = ResonancePosition(
+                    x = 24.4f,
+                    y = 41.2f,
+                    radius = 40.0f
+                ),
+               // maxLevel = 0.01f
+            ),
         ),
     ),
     LocationConfig(
-        id = "ULDAH",
-        name = "Ul'dah",
+        id = "BRUMEE",
+        name = "Brumée",
         frequencies = listOf(
-            ActivationFrequency(name = "RÉSONNANCE", target = 95000L, tolerance = 300L),
-            ActivationFrequency(name = "SIGNAL DEEP", target = 180000L, tolerance = 500L),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_1,
+                target = VIKTOR_ARTEFACT_1_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.2f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_2,
+                target = VIKTOR_ARTEFACT_2_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.2f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_3,
+                target = VIKTOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.2f
+            ),
+            ActivationFrequency(
+                name = ELEANOR_ARTEFACT_3,
+                target = ELEANOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.25f
+            ),
+        ),
+    ),
+
+    LocationConfig(
+        id = "NOSCEA_ORIENTALE",
+        name = "Noscea orientale",
+        frequencies = listOf(
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_1,
+                target = VIKTOR_ARTEFACT_1_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.3f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_2,
+                target = VIKTOR_ARTEFACT_2_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.3f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_3,
+                target = VIKTOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.3f
+            ),
+            ActivationFrequency(
+                name = ELEANOR_ARTEFACT_3,
+                target = ELEANOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.35f
+            ),
+        ),
+    ),
+    LocationConfig(
+        id = "HAUTE_NOSCEA",
+        name = "Haute Noscea",
+        frequencies = listOf(
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_1,
+                target = VIKTOR_ARTEFACT_1_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.1f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_2,
+                target = VIKTOR_ARTEFACT_2_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.1f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_3,
+                target = VIKTOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.1f
+            ),
+            ActivationFrequency(
+                name = ELEANOR_ARTEFACT_3,
+                target = ELEANOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.05f
+            ),
+        ),
+
+        ),
+    LocationConfig(
+        id = "NOSCEA_EXTERIEUR",
+        name = "Noscea exterieur",
+        frequencies = listOf(
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_1,
+                target = VIKTOR_ARTEFACT_1_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.05f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_2,
+                target = VIKTOR_ARTEFACT_2_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.05f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_3,
+                target = VIKTOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.05f
+            ),
+            ActivationFrequency(
+                name = ELEANOR_ARTEFACT_3,
+                target = ELEANOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.01f
+            ),
+        ),
+    ),
+    LocationConfig(
+        id = "NOSCEA_OCCIDENTAL",
+        name = "Noscea occidental",
+        frequencies = listOf(
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_1,
+                target = VIKTOR_ARTEFACT_1_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.3f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_2,
+                target = VIKTOR_ARTEFACT_2_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.3f
+            ),
+            ActivationFrequency(
+                name = VIKTOR_ARTEFACT_3,
+                target = VIKTOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.3f
+            ),
+            ActivationFrequency(
+                name = ELEANOR_ARTEFACT_3,
+                target = ELEANOR_ARTEFACT_3_FREQ,
+                tolerance = 600L,
+                maxLevel = 0.25f
+            ),
         ),
     ),
     LocationConfig(
@@ -57,7 +302,7 @@ fun buildLocations(): List<LocationConfig> = listOf(
                     y = 9.9f,
                     radius = 40.0f
                 ),
-                maxLevel = 0.1f
+               // maxLevel = 0.1f
             ),
             ActivationFrequency(
                 name = ELEANOR_ARTEFACT_2,
@@ -68,25 +313,7 @@ fun buildLocations(): List<LocationConfig> = listOf(
                     y = 9.9f,
                     radius = 40.0f
                 ),
-                maxLevel = 0.1f
-            ),
-        ),
-    ),
-    LocationConfig(
-        id = "ISHGARD",
-        name = "Ishgard - L'Assise",
-        frequencies = listOf(
-            ActivationFrequency(
-                name = ELEANOR_ARTEFACT_1,
-                target = ELEANOR_ARTEFACT_1_FREQ,
-                tolerance = 600L,
-                maxLevel = 0.4f
-            ),
-            ActivationFrequency(
-                name = ELEANOR_ARTEFACT_2,
-                target = ELEANOR_ARTEFACT_2_FREQ,
-                tolerance = 600L,
-                maxLevel = 0.4f
+              //  maxLevel = 0.1f
             ),
         ),
     ),
@@ -98,7 +325,7 @@ fun buildLocations(): List<LocationConfig> = listOf(
                 name = ELEANOR_ARTEFACT_1,
                 target = ELEANOR_ARTEFACT_1_FREQ,
                 tolerance = 600L,
-                maxLevel = 0.4f
+                maxLevel = 0.38f
             ),
             ActivationFrequency(
                 name = ELEANOR_ARTEFACT_2,
@@ -162,11 +389,7 @@ fun buildLocations(): List<LocationConfig> = listOf(
             ),
         ),
     ),
-    LocationConfig(
-        id = "GARLEMALD",
-        name = "Garlemald",
-        frequencies = listOf(),
-    ),
+
 )
 
 fun List<LocationConfig>.findById(id: String): LocationConfig =
