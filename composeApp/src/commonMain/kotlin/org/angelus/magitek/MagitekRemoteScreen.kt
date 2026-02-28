@@ -292,6 +292,7 @@ fun MagitekRemoteScreen() {
                                 },
                     onDragStart = { isDraggingDial = true },
                     onDragEnd   = { isDraggingDial = false },
+                    onDetent    = { feedback.triggerDialClick() },
                 )
                 StatusBar(frequency = globalFrequency)
             }

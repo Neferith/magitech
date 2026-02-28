@@ -32,9 +32,14 @@ fun FrequencyDial(
     onChange    : (Long) -> Unit,
     onDragStart : () -> Unit = {},
     onDragEnd   : () -> Unit = {},
+    onDetent    : () -> Unit = {},
     modifier    : Modifier = Modifier,
 ) {
     val textMeasurer = rememberTextMeasurer()
+
+    // Ajouter avec les autres remember dans FrequencyDial :
+    var lastDetentFreq by remember { mutableStateOf(frequency) }
+    val detentStep = 512L   // un cran tous les 512 unités (~0.2% de la plage)
 
     // Angle accumulé (en radians) — on en déduit la fréquence
     // 1 tour complet = MAX_FREQ / 8  (8 tours pour parcourir toute la plage)
@@ -117,6 +122,11 @@ fun FrequencyDial(
                                     .toLong()
                                     .coerceIn(0L, MAX_FREQ)
                                 onChange(newFreq)
+                                // Cran franchi ?
+                                if (kotlin.math.abs(newFreq - lastDetentFreq) >= detentStep) {
+                                    lastDetentFreq = (newFreq / detentStep) * detentStep
+                                    onDetent()
+                                }
                             },
                         )
                     },

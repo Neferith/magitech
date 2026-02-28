@@ -12,6 +12,7 @@ expect class FeedbackController {
     fun triggerRandomVibration()
     fun triggerActivationSound()   // ← nouveau
     fun triggerGlitchSound()
+    fun triggerDialClick()
     fun release()
 }
 

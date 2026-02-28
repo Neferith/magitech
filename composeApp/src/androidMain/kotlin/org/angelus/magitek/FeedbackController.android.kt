@@ -258,6 +258,32 @@ actual class FeedbackController(private val context: Context) {
         } catch (_: Exception) {}
     }
 
+    actual fun triggerDialClick() {
+        // Vibration très courte et légère — sensation de cran
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(8L, 40))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(8L)
+        }
+
+        // Clic mécanique sec — tick bref à haute fréquence
+        val durationMs = 12
+        val samples    = sampleRate * durationMs / 1000
+        val buffer     = ShortArray(samples)
+        for (i in 0 until samples) {
+            val t        = i.toDouble() / sampleRate
+            val envelope = kotlin.math.exp(-t * 80.0)   // decay très rapide
+            // Mix de deux fréquences pour un son plus riche
+            val signal   = kotlin.math.sin(2.0 * kotlin.math.PI * 1800.0 * t) * 0.6 +
+                    kotlin.math.sin(2.0 * kotlin.math.PI * 3200.0 * t) * 0.4
+            buffer[i]    = (signal * envelope * 0.35 * Short.MAX_VALUE)
+                .coerceIn(Short.MIN_VALUE.toDouble(), Short.MAX_VALUE.toDouble())
+                .toInt().toShort()
+        }
+        playSamples(buffer)
+    }
+
     actual fun release() {
         try {
             audioTrack.stop()
