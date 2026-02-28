@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "668793363125",
+    "project_id": "magitek-7d1ea",
+    "storage_bucket": "magitek-7d1ea.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:668793363125:android:dce7bc4091dd3c8c827cfc",
+        "android_client_info": {
+          "package_name": "org.angelus.magitek"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC3V1F0K9qmHBI-BvCzojlDp0LE2_iTJCw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

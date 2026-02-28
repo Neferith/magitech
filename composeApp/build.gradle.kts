@@ -8,6 +8,10 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
     kotlin("plugin.serialization") version "2.0.0"
+
+    id("com.google.gms.google-services")
+
+
 }
 
 kotlin {
@@ -25,6 +29,10 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation("androidx.appcompat:appcompat:1.7.0")
             implementation("androidx.preference:preference-ktx:1.2.1")
+
+            implementation(project.dependencies.platform("com.google.firebase:firebase-bom:34.9.0"))
+            implementation("com.google.firebase:firebase-analytics")
+
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)

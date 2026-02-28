@@ -93,6 +93,14 @@ fun MagitekRemoteScreen() {
         }
     }
 
+    LaunchedEffect(Unit) {
+        while (true) {
+            // Intervalle aléatoire entre 6 et 30 secondes
+            delay(Random.nextLong(6_000L, 15_000L))
+            feedback.triggerGlitchSound()
+        }
+    }
+
 // C'est tout. Le son démarre automatiquement au lancement via LaunchedEffect
 // et s'arrête proprement au DisposableEffect.
 
@@ -163,40 +171,6 @@ fun MagitekRemoteScreen() {
 
 
     // ── Gestion d'une pression simple (exécution) ─────────────────────────────
-    /*fun executeButton(index: Int) {
-        val config = buttonConfigs[index] ?: return
-        feedback.triggerCommandFeedback()
-
-        when (val assignment = config.assignment) {
-            is ButtonAssignment.SingleCommand -> {
-                val bits = assignment.command.encode64()
-                screenLog = listOf(
-                    "> CMD: ${assignment.displayLabel(config.customLabel)}", // Bonne valeur ?
-                    "> HEX: 0x${bits.toHex16()}",
-                    "> BIN: ${bits.toDisplayBin64()}",
-                    "> ${assignment.command.displayDescription()}",
-                )
-            }
-            is ButtonAssignment.Macro -> {
-                scope.launch {
-                    screenLog = listOf("> MACRO: ${assignment.name}", "> EXÉCUTION...")
-                    do {
-                        assignment.steps.forEachIndexed { i, step ->
-                            val bits = step.command.encode64()
-                            screenLog = listOf(
-                                "> MACRO [${i + 1}/${assignment.steps.size}]: ${assignment.name}",
-                                "> CMD: ${step.command.shortLabel()}",
-                                "> HEX: 0x${bits.toHex16()}",
-                            )
-                            feedback.triggerCommandFeedback()
-                            delay(step.delayAfterMs)
-                        }
-                    } while (assignment.loop)
-                    if (!assignment.loop) screenLog = listOf("> MACRO: ${assignment.name}", "> TERMINÉE.")
-                }
-            }
-        }
-    }*/
     fun executeButton(index: Int) {
         // ← ICI, en tout premier, avant le check config == null
         hiddenState = hiddenEngine.onButtonPressed(index)

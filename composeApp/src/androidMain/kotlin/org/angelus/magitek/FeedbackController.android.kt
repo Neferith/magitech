@@ -149,6 +149,115 @@ actual class FeedbackController(private val context: Context) {
         }
     }
 
+    actual fun triggerGlitchSound() {
+        // Choisit aléatoirement parmi plusieurs types de glitch
+        when (Random.nextInt(4)) {
+            0 -> playGlitchBurst()      // rafale de bruit blanc court
+            1 -> playFrequencyDrop()    // chute de fréquence rapide
+            2 -> playStaticCrackle()    // craquement électrique sec
+            3 -> playGlitchBurst()      // rafale courte (plus fréquent)
+        }
+    }
+
+    /** Rafale de bruit blanc — comme une friture radio */
+    private fun playGlitchBurst() {
+        val durationMs = Random.nextInt(30, 120)
+        val volume     = Random.nextDouble(0.05, 0.15)
+        val samples    = sampleRate * durationMs / 1000
+        val buffer     = ShortArray(samples)
+
+        for (i in 0 until samples) {
+            val t        = i.toDouble() / sampleRate
+            val envelope = when {
+                t < 0.005 -> t / 0.005                            // attaque 5ms
+                t > (durationMs / 1000.0 - 0.01) ->
+                    (durationMs / 1000.0 - t) / 0.01              // release 10ms
+                else -> 1.0
+            }
+            // Bruit blanc avec légère teinte rose
+            val noise = Random.nextDouble(-1.0, 1.0)
+            buffer[i] = (noise * envelope * volume * Short.MAX_VALUE)
+                .coerceIn(Short.MIN_VALUE.toDouble(), Short.MAX_VALUE.toDouble())
+                .toInt().toShort()
+        }
+        playSamples(buffer)
+    }
+
+    /** Chute de fréquence — signal qui décroche */
+    private fun playFrequencyDrop() {
+        val durationMs  = Random.nextInt(80, 200)
+        val startFreq   = Random.nextDouble(400.0, 1200.0)
+        val endFreq     = startFreq * Random.nextDouble(0.1, 0.4)
+        val volume      = Random.nextDouble(0.04, 0.12)
+        val samples     = sampleRate * durationMs / 1000
+        val buffer      = ShortArray(samples)
+        var phase       = 0.0
+
+        for (i in 0 until samples) {
+            val progress = i.toDouble() / samples
+            val freq     = startFreq + (endFreq - startFreq) * progress
+            val envelope = (1.0 - progress).pow(0.5)  // decay
+            val noise    = Random.nextDouble(-0.3, 0.3)  // légère saleté
+            phase       += freq / sampleRate
+            val signal   = kotlin.math.sin(2.0 * kotlin.math.PI * phase) + noise
+            buffer[i]    = (signal * envelope * volume * Short.MAX_VALUE)
+                .coerceIn(Short.MIN_VALUE.toDouble(), Short.MAX_VALUE.toDouble())
+                .toInt().toShort()
+        }
+        playSamples(buffer)
+    }
+
+    /** Craquement électrique sec — impulsion très courte */
+    private fun playStaticCrackle() {
+        // Série de 2 à 5 impulsions rapprochées
+        val count = Random.nextInt(2, 6)
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+        scope.launch {
+            repeat(count) {
+                val durationMs = Random.nextInt(8, 25)
+                val volume     = Random.nextDouble(0.1, 0.25)
+                val samples    = sampleRate * durationMs / 1000
+                val buffer     = ShortArray(samples)
+                for (i in 0 until samples) {
+                    val t        = i.toDouble() / (samples - 1)
+                    val envelope = kotlin.math.exp(-t * 20.0)
+                    val noise    = Random.nextDouble(-1.0, 1.0)
+                    buffer[i]    = (noise * envelope * volume * Short.MAX_VALUE)
+                        .coerceIn(Short.MIN_VALUE.toDouble(), Short.MAX_VALUE.toDouble())
+                        .toInt().toShort()
+                }
+                playSamples(buffer)
+                kotlinx.coroutines.delay(Random.nextLong(10L, 60L))
+            }
+        }
+    }
+
+    /** Lance la lecture d'un buffer PCM (non bloquant) */
+    private fun playSamples(buffer: ShortArray) {
+        try {
+            val track = android.media.AudioTrack(
+                android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+                android.media.AudioFormat.Builder()
+                    .setSampleRate(sampleRate)
+                    .setEncoding(android.media.AudioFormat.ENCODING_PCM_16BIT)
+                    .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_MONO)
+                    .build(),
+                buffer.size * 2,
+                android.media.AudioTrack.MODE_STATIC,
+                android.media.AudioManager.AUDIO_SESSION_ID_GENERATE,
+            )
+            track.write(buffer, 0, buffer.size)
+            track.play()
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                kotlinx.coroutines.delay(buffer.size.toLong() * 1000L / sampleRate + 200L)
+                track.release()
+            }
+        } catch (_: Exception) {}
+    }
+
     actual fun release() {
         try {
             audioTrack.stop()
