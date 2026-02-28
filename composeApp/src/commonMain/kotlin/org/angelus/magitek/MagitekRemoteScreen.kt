@@ -214,11 +214,12 @@ fun MagitekRemoteScreen() {
                 feedback.triggerCommandFeedback()
               //  val bits = assignment.command.encode64()
                 val bits = assignment.command.encode64WithFreq(globalFrequency)
-                screenLog = listOf(
+                screenLog = listOfNotNull(
                     "> CMD: ${assignment/*.command*/.displayLabel(config.customLabel)}",
                     "> HEX: 0x${bits.toHex16()}",
                     "> BIN: ${bits.toDisplayBin64()}",
-                    "> ${assignment.command.displayDescription()}",
+                    //"> ${assignment.command.displayDescription()}",
+                    if (isEditMode) "> ${assignment.command.displayDescription()}" else null,
                 )
             }
 
@@ -290,7 +291,8 @@ fun MagitekRemoteScreen() {
                     lines = screenLog,
                     hiddenState = hiddenState,
                     activeFrequency = activeFrequency,
-                    glitchEngine    = glitchEngine,
+                    glitchEngine = glitchEngine,
+                    isEditMode = isEditMode,
                 )
                 ButtonGrid(
                     buttonConfigs    = buttonConfigs,
@@ -586,6 +588,7 @@ fun MagitekButton(
 fun CommandScreen(
     lines          : List<String>,
     hiddenState    : HiddenState,
+    isEditMode        : Boolean,
     activeFrequency: ActivationFrequency? = null,
     glitchEngine   : GlitchEngine,
 ) {
@@ -633,11 +636,11 @@ fun CommandScreen(
                             GarlemaldColors.ScreenGreen.copy(alpha = 0.7f)
                         else lineColor(i, hiddenState),
                     ),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Clip,
                 )
             }
-            if (hiddenState is HiddenState.Complete) {
+            if (isEditMode && hiddenState is HiddenState.Complete) {
                 Text(
                     text  = "> !! ${hiddenState.fullMessage} !!",
                     style = MaterialTheme.typography.displayMedium.copy(
@@ -860,7 +863,7 @@ private fun injectHiddenBits(line: String, state: HiddenState): String {
  * Couleur de la ligne selon l'état du message caché.
  */
 @Composable
-private fun lineColor(lineIndex: Int, state: HiddenState): androidx.compose.ui.graphics.Color = when {
+private fun lineColor(lineIndex: Int, state: HiddenState): Color = when {
     // La ligne BIN pulse en bleu magitek quand une séquence est en cours
     lineIndex == 2 && state is HiddenState.Revealing -> GarlemaldColors.MagitekBlue
     lineIndex == 2 && state is HiddenState.Complete  -> GarlemaldColors.ImperialRedGlow
