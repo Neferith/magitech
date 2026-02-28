@@ -35,6 +35,7 @@ import org.angelus.magitek.model.HiddenState
 import org.angelus.magitek.model.buildActivationFrequencies
 import org.angelus.magitek.model.buildDefaultButtonConfigs
 import org.angelus.magitek.model.buildDefaultSecrets
+import org.angelus.magitek.model.buildEditModeController
 import org.angelus.magitek.model.buildLocations
 import org.angelus.magitek.model.detect
 import org.angelus.magitek.model.toDisplayBin64
@@ -113,6 +114,9 @@ fun MagitekRemoteScreen() {
 
     var globalFrequency by remember { mutableStateOf(0L) }
 
+    val editModeController = remember { buildEditModeController() }
+    val isEditMode by remember { derivedStateOf { editModeController.isUnlocked } }
+
     // Dispose feedback
     DisposableEffect(Unit) { onDispose { feedback.release() } }
 
@@ -178,6 +182,19 @@ fun MagitekRemoteScreen() {
 
     // ── Gestion d'une pression simple (exécution) ─────────────────────────────
     fun executeButton(index: Int) {
+
+        val modeChanged = editModeController.onButtonPressed(index, scope)
+        if (modeChanged) {
+            screenLog = if (editModeController.isUnlocked) listOf(
+                "> MODE ÉDITION ACTIVÉ",
+                "> APPUI LONG POUR CONFIGURER",
+            ) else listOf(
+                "> MODE ÉDITION DÉSACTIVÉ",
+                "> _",
+            )
+            return  // on ne déclenche pas de commande sur la séquence de déverrouillage
+        }
+
         // ← ICI, en tout premier, avant le check config == null
         hiddenState = hiddenEngine.onButtonPressed(index)
 
@@ -229,11 +246,17 @@ fun MagitekRemoteScreen() {
                             assignment.steps.forEachIndexed { i, step ->
                                 //val bits = step.command.encode64()
                                 val bits = step.command.encode64WithFreq(globalFrequency)
-                                screenLog = listOf(
+                                /*screenLog = listOf(
                                     "> MACRO [${i + 1}/${assignment.steps.size}]: ${assignment.name}",
                                     "> CMD: ${step.command.shortLabel()}",
                                     "> HEX: 0x${bits.toHex16()}",
-                                )
+                                )*/
+                                screenLog = listOf(
+                                    "> CMD: ${config.customLabel ?: "BTN-${index.toString().padStart(2, '0')}"}",
+                                    "> HEX: 0x${bits.toHex16()}",
+                                    "> BIN: ${bits.toDisplayBin64()}",
+                                    // description supprimée — uniquement en mode édition
+                                ) + if (isEditMode) listOf("> ${step.command.displayDescription()}") else emptyList()
                                 feedback.triggerCommandFeedback()
                                 delay(step.delayAfterMs)
                             }
@@ -272,9 +295,13 @@ fun MagitekRemoteScreen() {
                 ButtonGrid(
                     buttonConfigs    = buttonConfigs,
                     runningMacroIndex = runningMacroIndex,
+                    isEditMode        = isEditMode,
                     glitchEngine    = glitchEngine,
                     onTap            = { index -> executeButton(index) },
-                    onLongPress      = { index -> editingButtonIndex = index; showAssignTypeFor = index },
+                    onLongPress      = { index ->
+                        editingButtonIndex = index;
+                        if (isEditMode) showAssignTypeFor = index
+                                       },
                     modifier         = Modifier.weight(1f),
                 )
                 FrequencyDial(
@@ -415,6 +442,7 @@ private fun AssignOption(label: String, color: Color, onClick: () -> Unit) {
 fun ButtonGrid(
     buttonConfigs     : Map<Int, ButtonConfig>,
     runningMacroIndex : Int?,
+    isEditMode        : Boolean,
     glitchEngine      : GlitchEngine,
     onTap             : (Int) -> Unit,
     onLongPress       : (Int) -> Unit,
@@ -434,6 +462,7 @@ fun ButtonGrid(
                 index       = index,
                 config      = buttonConfigs[index],
                 isRunning   = runningMacroIndex == index,
+                isEditMode  = isEditMode,
                 onTap       = { onTap(index) },
                 onLongPress = { onLongPress(index) },
             )
@@ -449,6 +478,7 @@ fun MagitekButton(
     index      : Int,
     config     : ButtonConfig?,
     isRunning  : Boolean,
+    isEditMode : Boolean,
     onTap      : () -> Unit,
     onLongPress: () -> Unit,
 ) {
@@ -475,6 +505,7 @@ fun MagitekButton(
         isRunning  -> GarlemaldColors.MagitekBlueDim
         isMacro    -> GarlemaldColors.MagitekBlueDim.copy(alpha = 0.5f)
         isAssigned -> GarlemaldColors.SurfaceVariant
+        isEditMode -> GarlemaldColors.ScreenBackground   // non assigné en mode édition
         else       -> GarlemaldColors.Background
     }
     val borderColor = when {
@@ -482,6 +513,7 @@ fun MagitekButton(
         isRunning  -> GarlemaldColors.MagitekBlue.copy(alpha = pulseAlpha)
         isMacro    -> GarlemaldColors.MagitekBlue
         isAssigned -> GarlemaldColors.Border
+        isEditMode -> GarlemaldColors.ScreenGreenDim.copy(alpha = 0.4f)  // contour vert discret
         else       -> GarlemaldColors.MetalDark.copy(alpha = 0.4f)
     }
     val textColor = when {
