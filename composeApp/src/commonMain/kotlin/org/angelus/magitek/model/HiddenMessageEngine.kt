@@ -150,7 +150,7 @@ sealed class HiddenState {
 fun buildDefaultSecrets(): List<HiddenSecret> = listOf(
     HiddenSecret(
         sequence      = listOf(0, 9, 8, 11),   // JOI_FAI → NEU_FAI → MEM_FAI → CUL_SUP
-        message       = "ELEANOR",
+        message       = "ANNAH",
         charsPerStep  = 2,
     ),
     HiddenSecret(

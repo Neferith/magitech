@@ -167,6 +167,28 @@ fun MagitekRemoteScreen(
         }
     }
 
+    // Dans MagitekRemoteScreen, après les autres LaunchedEffect :
+
+// Détection initiale au démarrage avec la fréquence restaurée
+    LaunchedEffect(Unit) {
+        val detected = activationFrequencies.detectWithLevel(
+            frequency = globalFrequency,
+            currentX  = appSettings.currentX,
+            currentY  = appSettings.currentY,
+        )
+        resonanceLevel = detected
+    }
+
+    // Recalcul si la position change
+    LaunchedEffect(appSettings.currentX, appSettings.currentY) {
+        val detected = activationFrequencies.detectWithLevel(
+            frequency = globalFrequency,
+            currentX  = appSettings.currentX,
+            currentY  = appSettings.currentY,
+        )
+        resonanceLevel = detected
+    }
+
     LaunchedEffect(isDraggingDial, resonanceLevel) {
        /* if (isDraggingDial) {
             // Monte pendant le drag
