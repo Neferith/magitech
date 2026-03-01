@@ -15,6 +15,9 @@ expect class FeedbackController {
     fun triggerDialClick()
 
     fun triggerErrorFeedback()     // ← nouveau
+
+    fun triggerTranslatorActivation()
+    fun triggerTranslatorDeactivation()
     fun release()
 }
 

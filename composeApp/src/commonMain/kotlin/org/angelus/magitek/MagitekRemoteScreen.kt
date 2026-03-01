@@ -339,6 +339,11 @@ fun MagitekRemoteScreen(
         // Séquence traducteur — priorité sur tout sauf edit mode
         val translatorChanged = translatorController.onButtonPressed(index)
         if (translatorChanged) {
+            if (isTranslatorMode) {
+                feedback.triggerTranslatorActivation()
+            } else {
+                feedback.triggerTranslatorDeactivation()
+            }
             safeLogChange(
                 if (isTranslatorMode) listOf(
                     "> MODE TRADUCTEUR ACTIVÉ",

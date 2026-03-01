@@ -329,6 +329,41 @@ actual class FeedbackController(private val context: Context) {
         playSamples(buffer)
     }
 
+    actual fun triggerTranslatorActivation() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(
+                VibrationEffect.createOneShot(40L, 120)
+            )
+        }
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+        scope.launch {
+            playErrorTone(freq = 600.0, durationMs = 60, volume = 0.25)
+            delay(20L)
+            playErrorTone(freq = 900.0, durationMs = 60, volume = 0.25)
+            delay(20L)
+            playErrorTone(freq = 1200.0, durationMs = 100, volume = 0.3)
+        }
+    }
+
+    // Désactivation — deux tons descendants + vibration double
+    actual fun triggerTranslatorDeactivation() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(
+                VibrationEffect.createWaveform(
+                    longArrayOf(0L, 40L, 40L, 40L),
+                    intArrayOf(0, 100, 0, 80),
+                    -1,
+                )
+            )
+        }
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+        scope.launch {
+            playErrorTone(freq = 900.0, durationMs = 60, volume = 0.25)
+            delay(20L)
+            playErrorTone(freq = 500.0, durationMs = 100, volume = 0.2)
+        }
+    }
+
     actual fun release() {
         try {
             audioTrack.stop()
