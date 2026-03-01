@@ -16,6 +16,7 @@ import android.os.VibratorManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.*
 import kotlin.random.Random
@@ -278,6 +279,50 @@ actual class FeedbackController(private val context: Context) {
             val signal   = kotlin.math.sin(2.0 * kotlin.math.PI * 1800.0 * t) * 0.6 +
                     kotlin.math.sin(2.0 * kotlin.math.PI * 3200.0 * t) * 0.4
             buffer[i]    = (signal * envelope * 0.35 * Short.MAX_VALUE)
+                .coerceIn(Short.MIN_VALUE.toDouble(), Short.MAX_VALUE.toDouble())
+                .toInt().toShort()
+        }
+        playSamples(buffer)
+    }
+
+    actual fun triggerErrorFeedback() {
+        // Double impulsion vibration — pattern "erreur"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(
+                VibrationEffect.createWaveform(
+                    longArrayOf(0L, 60L, 80L, 60L),   // délai, vib, pause, vib
+                    intArrayOf(0, 180, 0, 180),         // amplitudes
+                    -1,                                  // pas de repeat
+                )
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(longArrayOf(0L, 60L, 80L, 60L), -1)
+        }
+
+        // Son grave et court — deux tons descendants
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+        scope.launch {
+            playErrorTone(freq = 220.0, durationMs = 80, volume = 0.3)
+            delay(40L)
+            playErrorTone(freq = 150.0, durationMs = 120, volume = 0.25)
+        }
+    }
+
+    /** Génère un ton pur à la fréquence donnée */
+    private fun playErrorTone(freq: Double, durationMs: Int, volume: Double) {
+        val samples = sampleRate * durationMs / 1000
+        val buffer  = ShortArray(samples)
+        var phase   = 0.0
+        for (i in 0 until samples) {
+            val t        = i.toDouble() / samples
+            val envelope = when {
+                t < 0.05 -> t / 0.05
+                t > 0.85 -> (1.0 - t) / 0.15
+                else     -> 1.0
+            }
+            phase   += freq / sampleRate
+            buffer[i] = (kotlin.math.sin(2.0 * kotlin.math.PI * phase) * envelope * volume * Short.MAX_VALUE)
                 .coerceIn(Short.MIN_VALUE.toDouble(), Short.MAX_VALUE.toDouble())
                 .toInt().toShort()
         }

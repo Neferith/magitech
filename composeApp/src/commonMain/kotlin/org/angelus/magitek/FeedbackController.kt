@@ -13,6 +13,8 @@ expect class FeedbackController {
     fun triggerActivationSound()   // ← nouveau
     fun triggerGlitchSound()
     fun triggerDialClick()
+
+    fun triggerErrorFeedback()     // ← nouveau
     fun release()
 }
 

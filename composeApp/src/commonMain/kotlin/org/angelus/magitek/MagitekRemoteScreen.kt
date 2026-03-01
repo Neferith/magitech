@@ -66,6 +66,8 @@ data class ButtonState(
     val config: ButtonConfig?,   // null = non assigné
 )
 
+private const val RESONANCE_THRESHOLD = 0.90f
+
 // ── Écran principal ───────────────────────────────────────────────────────────
 
 @Composable
@@ -292,6 +294,37 @@ fun MagitekRemoteScreen(
         }
     }
 
+    fun checkResonance(): Boolean {
+        val level = resonanceLevel
+
+        return when {
+            // Pas de résonance du tout
+            level == null -> {
+                feedback.triggerErrorFeedback()    // ← ajout
+                safeLogChange(listOf(
+                    "> LIEN ÉTHÉRIQUE NON ÉTABLI",
+                    "> ARTEFACT NON LOCALISÉ",
+                ))
+                false
+            }
+
+            // Résonance insuffisante
+            level.level < RESONANCE_THRESHOLD -> {
+                feedback.triggerErrorFeedback()    // ← ajout
+                val artefactCode = level.frequency.name.removePrefix("Artefact ").trim()
+                safeLogChange(listOf(
+                    "> LIEN ÉTHÉRIQUE INSUFFISANT",
+                    "> $artefactCode — SYNC: ${level.percent}% — SEUIL: 90%",
+                ))
+                false
+            }
+
+            // OK
+            else -> true
+        }
+    }
+
+
 
     // ── Gestion d'une pression simple (exécution) ─────────────────────────────
     fun executeButton(index: Int) {
@@ -326,6 +359,9 @@ fun MagitekRemoteScreen(
             )
             return
         }
+
+        // ── Vérification de résonance ─────────────────────────────────────────────
+        if (!checkResonance()) return
 
         when (val assignment = config.assignment) {
             is ButtonAssignment.SingleCommand -> {
@@ -413,6 +449,8 @@ fun MagitekRemoteScreen(
             }
         }
     }
+
+
 
     LifecycleEffect(
         onPause = { staticHum.stop() },
