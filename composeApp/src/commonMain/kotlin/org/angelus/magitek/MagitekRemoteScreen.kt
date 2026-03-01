@@ -45,6 +45,7 @@ import org.angelus.magitek.model.buildDefaultSecrets
 import org.angelus.magitek.model.buildEditModeController
 import org.angelus.magitek.model.buildLocations
 import org.angelus.magitek.model.buildOverflowState
+import org.angelus.magitek.model.buildTranslatorController
 import org.angelus.magitek.model.detectWithLevel
 import org.angelus.magitek.model.toDisplayBin64
 import org.angelus.magitek.model.toHex16
@@ -154,6 +155,9 @@ fun MagitekRemoteScreen(
 
 
     val globalFrequencyRef = rememberUpdatedState(globalFrequency)
+
+    val translatorController = remember { buildTranslatorController() }
+    val isTranslatorMode by remember { derivedStateOf { translatorController.isActive } }
 
     //var globalFrequency by remember { mutableStateOf(0L) }
 
@@ -329,6 +333,34 @@ fun MagitekRemoteScreen(
     // ── Gestion d'une pression simple (exécution) ─────────────────────────────
     fun executeButton(index: Int) {
 
+        // Séquence traducteur — priorité sur tout sauf edit mode
+        val translatorChanged = translatorController.onButtonPressed(index)
+        if (translatorChanged) {
+            safeLogChange(
+                if (isTranslatorMode) listOf(
+                    "> MODE TRADUCTEUR ACTIVÉ",
+                    "> SAISIR CODES XAR...",
+                    "> DÉCODÉ: —",
+                ) else listOf(
+                    "> MODE TRADUCTEUR DÉSACTIVÉ",
+                    "> _",
+                )
+            )
+            return
+        }
+
+        // En mode traducteur, on n'exécute pas les commandes classiques
+        // (le bouton a déjà été ajouté au buffer dans onButtonPressed)
+        if (isTranslatorMode) {
+            safeLogChange(listOf(
+                "> ${translatorController.inputCodes.takeLast(8).joinToString(" ")}",
+                "> ...",
+                "> DÉCODÉ: ${translatorController.decodedText}",
+            ))
+            feedback.triggerDialClick()   // clic léger, pas de commande
+            return
+        }
+
         val wasEditMode = isEditMode
         val modeChanged = editModeController.onButtonPressed(index, scope, isEditMode)
         if (modeChanged) {
@@ -472,6 +504,10 @@ fun MagitekRemoteScreen(
                     lines = screenLog,
                     hiddenState = hiddenState,
                     resonanceLevel = resonanceLevel,
+                    overflowState = overflowState,
+                    translatorMode    = isTranslatorMode,
+                    translatorCodes   = translatorController.inputCodes,
+                    translatorDecoded = translatorController.decodedText,
                     glitchEngine = glitchEngine,
                     isEditMode = isEditMode,
                 )
@@ -788,6 +824,10 @@ fun CommandScreen(
     hiddenState: HiddenState,
     isEditMode: Boolean,
     resonanceLevel : ResonanceLevel? = null,
+    overflowState     : OverflowState   = OverflowState(),
+    translatorMode    : Boolean         = false,
+    translatorCodes   : List<String>    = emptyList(),
+    translatorDecoded : String          = "—",
     glitchEngine: GlitchEngine,
 ) {
     val displayLines = glitchEngine.corruptedLines ?: lines
@@ -801,6 +841,11 @@ fun CommandScreen(
             .border(
                 width = 2.dp,
                 color = when {
+                   /* resonanceLevel?.isComplete == true -> GarlemaldColors.ImperialRed
+                    resonanceLevel != null             -> GarlemaldColors.ImperialRed.copy(alpha = resonanceLevel.level)
+                    else                               -> GarlemaldColors.ScreenGreenDim*/
+                    overflowState.isActive             -> GarlemaldColors.ImperialRedGlow
+                    translatorMode                     -> GarlemaldColors.MagitekBlue      // ← bleu en mode traducteur
                     resonanceLevel?.isComplete == true -> GarlemaldColors.ImperialRed
                     resonanceLevel != null             -> GarlemaldColors.ImperialRed.copy(alpha = resonanceLevel.level)
                     else                               -> GarlemaldColors.ScreenGreenDim
@@ -820,6 +865,52 @@ fun CommandScreen(
             }
             .padding(10.dp),
     ) {
+        if (translatorMode) {
+            // ── Affichage traducteur ──────────────────────────────────────────
+            Column(
+                modifier            = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                // En-tête mode
+                Text(
+                    text  = "> TRADUCTEUR MAGITEK",
+                    style = MaterialTheme.typography.displayMedium.copy(
+                        fontSize = 9.sp,
+                        color    = GarlemaldColors.MagitekBlue,
+                    ),
+                )
+                // Codes saisis — scrollable horizontalement si beaucoup
+                Text(
+                    text     = "> ${translatorCodes.takeLast(10).joinToString(" ").ifEmpty { "_" }}",
+                    style    = MaterialTheme.typography.displayMedium.copy(
+                        fontSize = 9.sp,
+                        color    = GarlemaldColors.ScreenGreen,
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
+                )
+                // Séparateur
+                Text(
+                    text  = "> ─────────────────",
+                    style = MaterialTheme.typography.displayMedium.copy(
+                        fontSize = 8.sp,
+                        color    = GarlemaldColors.ScreenGreenDim,
+                    ),
+                )
+                // Texte décodé
+                Text(
+                    text  = "> $translatorDecoded",
+                    style = MaterialTheme.typography.displayMedium.copy(
+                        fontSize      = 11.sp,
+                        color         = GarlemaldColors.MagitekBlueGlow,
+                        letterSpacing = 2.sp,
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
+                )
+            }
+        } else {
+
         Column(
             modifier = Modifier.offset(x = shift.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -857,16 +948,17 @@ fun CommandScreen(
         // Indicateur résonance en bas à droite
         if (resonanceLevel != null) {
             Text(
-                text     = if (resonanceLevel.isComplete) "◆ SYNC" else "◇ ${resonanceLevel.percent}%",
-                style    = MaterialTheme.typography.displayMedium.copy(
+                text = if (resonanceLevel.isComplete) "◆ SYNC" else "◇ ${resonanceLevel.percent}%",
+                style = MaterialTheme.typography.displayMedium.copy(
                     fontSize = 9.sp,
-                    color    = GarlemaldColors.ImperialRed.copy(
+                    color = GarlemaldColors.ImperialRed.copy(
                         alpha = 0.5f + resonanceLevel.level * 0.5f
                     ),
                 ),
                 modifier = Modifier.align(Alignment.BottomEnd),
             )
         }
+    }
     }
 }
 

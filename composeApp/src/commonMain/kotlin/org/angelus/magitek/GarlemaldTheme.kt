@@ -27,6 +27,8 @@ object GarlemaldColors {
     val MagitekBlue      = Color(0xFF3399FF)   // Lueur bleutée de l'aération
     val MagitekBlueDim   = Color(0xFF114488)
 
+    val MagitekBlueGlow = Color(0xFF66BBFF)
+
     val MetalLight       = Color(0xFF888888)   // Chrome / vis
     val MetalDark        = Color(0xFF444444)
 
