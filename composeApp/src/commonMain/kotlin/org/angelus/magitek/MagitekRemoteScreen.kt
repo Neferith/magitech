@@ -31,15 +31,19 @@ import org.angelus.magitek.model.ButtonAssignment
 import org.angelus.magitek.model.ButtonConfig
 import org.angelus.magitek.model.ButtonLabelEncoder
 import org.angelus.magitek.model.CommandSpec
+import org.angelus.magitek.model.ContradictionDetector
 import org.angelus.magitek.model.EditModeController
 import org.angelus.magitek.model.HiddenMessageEngine
 import org.angelus.magitek.model.HiddenState
+import org.angelus.magitek.model.OverflowState
 import org.angelus.magitek.model.ResonanceLevel
 import org.angelus.magitek.model.buildActivationFrequencies
+import org.angelus.magitek.model.buildContradictionRules
 import org.angelus.magitek.model.buildDefaultButtonConfigs
 import org.angelus.magitek.model.buildDefaultSecrets
 import org.angelus.magitek.model.buildEditModeController
 import org.angelus.magitek.model.buildLocations
+import org.angelus.magitek.model.buildOverflowState
 import org.angelus.magitek.model.detectWithLevel
 import org.angelus.magitek.model.toDisplayBin64
 import org.angelus.magitek.model.toHex16
@@ -72,6 +76,25 @@ fun MagitekRemoteScreen(
     globalFrequency: Long,
     onGlobalFrequencyChange: (Long) -> Unit,
 ) {
+
+    var overflowState by remember { mutableStateOf(OverflowState()) }
+
+    // Override — ignore les logs normaux pendant l'overflow
+    val safeLogChange: (List<String>) -> Unit = { lines ->
+        if (!overflowState.isActive) onScreenLogChange(lines)
+    }
+
+    val contradictionDetector = remember {
+        ContradictionDetector(
+            rules = buildContradictionRules(),
+            intervalMs = 100L,
+            durationMs = 20_000L,
+            onOverflow = { rule ->
+                overflowState = buildOverflowState(rule.overflowMsg)
+            },
+        )
+    }
+
 
     val repository = rememberButtonRepository()
     val feedback = rememberFeedbackController()
@@ -234,6 +257,36 @@ fun MagitekRemoteScreen(
         }
     }
 
+    val dissonanceLabels = remember {
+        listOf(
+            "!! OVERFLOW !!",
+            "!! DISSONANCE !!",
+            "!! CONVULSION !!",
+            "!! EXTRACTION URGENCE !!",
+        )
+    }
+
+    LaunchedEffect(overflowState.isActive) {
+        if (!overflowState.isActive) return@LaunchedEffect
+        while (true) {
+            // Glitch visuel intense — intervalles très courts
+            delay(Random.nextLong(300L, 800L))
+            glitchEngine.triggerGlitch(this, screenLog)
+            feedback.triggerGlitchSound()
+
+            // Affichage alterné : message encodé ↔ corruption totale
+            val words    = overflowState.encodedWords
+            val allCodes = words.flatten()
+           onScreenLogChange(
+               listOf(
+                "> ${dissonanceLabels.random()}",
+                "> ${allCodes.shuffled().take(6).joinToString(" ")}",
+                "> ERR:${Random.nextInt(0xFFFF).toString(16).uppercase().padStart(4, '0')}",
+                "> ${allCodes.random()} ${allCodes.random()} ${allCodes.random()}",
+            )
+           )
+        }
+    }
 
 
     // ── Gestion d'une pression simple (exécution) ─────────────────────────────
@@ -242,7 +295,7 @@ fun MagitekRemoteScreen(
         val wasEditMode = isEditMode
         val modeChanged = editModeController.onButtonPressed(index, scope, isEditMode)
         if (modeChanged) {
-            onScreenLogChange(
+            safeLogChange(
                 if (!wasEditMode) listOf(
                     "> MODE ÉDITION ACTIVÉ",
                     "> APPUI LONG POUR CONFIGURER",
@@ -261,7 +314,7 @@ fun MagitekRemoteScreen(
         val config = buttonConfigs[index]
 
         if (config == null) {
-            onScreenLogChange(
+            safeLogChange(
                 listOf(
                     "> BTN-${index.toString().padStart(2, '0')}: NON ASSIGNÉ",
                     "> APPUI LONG POUR CONFIGURER",
@@ -275,7 +328,7 @@ fun MagitekRemoteScreen(
                 feedback.triggerCommandFeedback()
                 //  val bits = assignment.command.encode64()
                 val bits = assignment.command.encode64WithFreq(globalFrequency)
-                onScreenLogChange(
+                safeLogChange(
                     listOfNotNull(
                         "> CMD: ${/*assignment/*.command*/.displayLabel(config.customLabel)*/ButtonLabelEncoder.encode(
                             config.buttonIndex
@@ -287,6 +340,7 @@ fun MagitekRemoteScreen(
                         if (isEditMode) "> ${assignment.command.displayDescription()}" else null,
                     )
                 )
+                contradictionDetector.onCommandExecuted(assignment.command)
             }
 
             is ButtonAssignment.Macro -> {
@@ -295,12 +349,14 @@ fun MagitekRemoteScreen(
                     runningMacroJob?.cancel()
                     runningMacroJob = null
                     runningMacroIndex = null
-                    onScreenLogChange(
+                    safeLogChange(
                         listOf(
                             "> MACRO: ${assignment.name}",
                             "> ARRÊTÉE.",
                         )
                     )
+                    overflowState = OverflowState()
+                    contradictionDetector.reset()
                     return
                 }
 
@@ -309,7 +365,7 @@ fun MagitekRemoteScreen(
 
                 runningMacroIndex = index
                 runningMacroJob = scope.launch {
-                    onScreenLogChange(listOf("> MACRO: ${assignment.name}", "> EXÉCUTION..."))
+                    safeLogChange(listOf("> MACRO: ${assignment.name}", "> EXÉCUTION..."))
                     try {
                         do {
                             assignment.steps.forEachIndexed { i, step ->
@@ -320,7 +376,7 @@ fun MagitekRemoteScreen(
                                     "> CMD: ${step.command.shortLabel()}",
                                     "> HEX: 0x${bits.toHex16()}",
                                 )*/
-                                onScreenLogChange(
+                                safeLogChange(
                                     listOf(
                                         "> CMD: ${
                                             config.customLabel ?: "BTN-${
@@ -333,12 +389,13 @@ fun MagitekRemoteScreen(
                                     ) + if (isEditMode) listOf("> ${step.command.displayDescription()}") else emptyList()
                                 )
                                 feedback.triggerCommandFeedback()
+                                contradictionDetector.onCommandExecuted(step.command)
                                 delay(step.delayAfterMs)
                             }
                         } while (assignment.loop)
 
                         if (!assignment.loop) {
-                            onScreenLogChange(listOf("> MACRO: ${assignment.name}", "> TERMINÉE."))
+                            safeLogChange(listOf("> MACRO: ${assignment.name}", "> TERMINÉE."))
                         }
                     } catch (_: CancellationException) {
                         // Annulation propre — screenLog déjà mis à jour
