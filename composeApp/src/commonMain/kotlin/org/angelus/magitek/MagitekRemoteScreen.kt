@@ -35,6 +35,7 @@ import org.angelus.magitek.model.ContradictionDetector
 import org.angelus.magitek.model.EditModeController
 import org.angelus.magitek.model.HiddenMessageEngine
 import org.angelus.magitek.model.HiddenState
+import org.angelus.magitek.model.MagitekModules
 import org.angelus.magitek.model.OverflowState
 import org.angelus.magitek.model.ResonanceLevel
 import org.angelus.magitek.model.buildActivationFrequencies
@@ -86,11 +87,14 @@ fun MagitekRemoteScreen(
 
     val contradictionDetector = remember {
         ContradictionDetector(
-            rules = buildContradictionRules(),
             intervalMs = 100L,
             durationMs = 20_000L,
-            onOverflow = { rule ->
-                overflowState = buildOverflowState(rule.overflowMsg)
+            onOverflow = { cmdA, cmdB ->
+                val module = MagitekModules.byCode[cmdA.moduleCode]
+                val subA   = module?.submodules?.get(cmdA.submoduleCode) ?: cmdA.submoduleCode
+                val subB   = module?.submodules?.get(cmdB.submoduleCode) ?: cmdB.submoduleCode
+                val msg    = "DISSONANCE ${subA.uppercase()} ${subB.uppercase()}"
+                overflowState = buildOverflowState(msg)
             },
         )
     }

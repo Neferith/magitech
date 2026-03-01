@@ -12,12 +12,10 @@ import org.angelus.magitek.Logger
  * dans une fenêtre de 20 secondes → overflow.
  */
 class ContradictionDetector(
-    private val rules          : List<ContradictionRule>,
-    private val intervalMs     : Long = 100L,
-    private val durationMs     : Long = 20_000L,
-    private val onOverflow     : (ContradictionRule) -> Unit,
+    private val intervalMs : Long = 100L,
+    private val durationMs : Long = 20_000L,
+    private val onOverflow : (CommandSpec, CommandSpec) -> Unit,
 ) {
-    // Historique : timestamp + commande
     private data class Entry(val timeMs: Long, val command: CommandSpec)
 
     private val history = ArrayDeque<Entry>()
@@ -32,31 +30,27 @@ class ContradictionDetector(
             history.removeFirst()
         }
 
-        // Vérifie chaque règle
-        for (rule in rules) {
-            if (checkRule(rule, now)) {
-                history.clear()
-                onOverflow(rule)
-                return
-            }
-        }
+        checkForDissonance(command, now)
     }
 
-    private fun checkRule(rule: ContradictionRule, now: Long): Boolean {
-        // Filtre les entrées concernées par cette règle
-        val relevant = history.filter { entry ->
-            rule.matches(entry.command)
+    private fun checkForDissonance(latest: CommandSpec, now: Long) {
+        // Cherche une commande contradictoire dans l'historique
+        val opponents = history.filter { entry ->
+            entry.command != latest &&
+                    MagitekModules.areContradictory(latest, entry.command)
         }
+        if (opponents.isEmpty()) return
 
-        if (relevant.size < 2) return false
-
-        // Compte les alternances rapides dans la fenêtre de durée
-        val minAlternances = (durationMs / intervalMs).toInt()   // ~200
+        // Compte les alternances rapides sur la durée
+        val minAlternances = (durationMs / intervalMs).toInt()
         var alternances    = 0
         var lastCommand    : CommandSpec? = null
         var lastTime       : Long = 0L
 
-        for (entry in relevant) {
+        for (entry in history) {
+            if (!MagitekModules.areContradictory(latest, entry.command) &&
+                entry.command != latest) continue
+
             if (lastCommand == null) {
                 lastCommand = entry.command
                 lastTime    = entry.timeMs
@@ -64,26 +58,24 @@ class ContradictionDetector(
             }
 
             val timeDiff    = entry.timeMs - lastTime
-            val isAlternate = rule.areContradictory(lastCommand!!, entry.command)
-            val isFast      = timeDiff <= intervalMs * 2   // tolérance x2
+            val isAlternate = lastCommand != entry.command &&
+                    MagitekModules.areContradictory(lastCommand!!, entry.command)
+            val isFast      = timeDiff <= intervalMs * 2
 
             if (isAlternate && isFast) {
                 alternances++
-                Logger.d("ALTERNANCES ", "ALTERNE" + alternances)
                 if (alternances >= minAlternances) {
-                    return true
+                    history.clear()
+                    onOverflow(lastCommand!!, entry.command)
+                    return
                 }
             } else {
-                // Séquence brisée — repart à 0
                 alternances = 0
-                Logger.d("ALTERNANCES ", "ALTERNE" + alternances + " IsAlter : " + isAlternate + "IsFast : " + isFast)
             }
 
             lastCommand = entry.command
             lastTime    = entry.timeMs
         }
-
-        return false
     }
 
     fun reset() = history.clear()
