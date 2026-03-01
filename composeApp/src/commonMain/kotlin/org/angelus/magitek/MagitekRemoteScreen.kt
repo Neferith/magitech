@@ -792,7 +792,7 @@ fun MagitekButton(
             .aspectRatio(1f)
             .background(bgColor)
             .border(1.dp, borderColor)
-            .pointerInput(Unit) {
+            .pointerInput(isEditMode) {
                 detectTapGestures(
                     onPress = { offset ->
                         // Émettre immédiatement le press → visuel rouge instantané
