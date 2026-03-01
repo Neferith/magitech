@@ -120,8 +120,13 @@ fun MagitekRemoteScreen(
         derivedStateOf { locations.findById(appSettings.locationId) }
     }
 
-    val activationFrequencies by remember(currentLocation) {
+  /*  val activationFrequencies by remember(currentLocation) {
         derivedStateOf { currentLocation.frequencies }
+    }*/
+    val activationFrequencies = remember(appSettings.locationId) {
+        buildLocations()
+            .findById(appSettings.locationId)
+            .frequencies
     }
     var resonanceLevel by remember { mutableStateOf<ResonanceLevel?>(null) }
 
@@ -217,7 +222,7 @@ fun MagitekRemoteScreen(
     }
 
     // Recalcul si la position change
-    LaunchedEffect(appSettings.currentX, appSettings.currentY) {
+    LaunchedEffect(appSettings.currentX, appSettings.currentY, appSettings.locationId) {
         val detected = activationFrequencies.detectWithLevel(
             frequency = globalFrequency,
             currentX  = appSettings.currentX,
