@@ -158,4 +158,9 @@ fun buildDefaultSecrets(): List<HiddenSecret> = listOf(
         message       = "LIBRE",
         charsPerStep  = 1,
     ),
+    HiddenSecret(
+        sequence      = listOf(26, 26, 26, 26), // FLX_SYN → AMP → BLK → DET
+        message       = "MOI",
+        charsPerStep  = 1,
+    ),
 )

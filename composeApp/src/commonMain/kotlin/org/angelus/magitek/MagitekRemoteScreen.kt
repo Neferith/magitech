@@ -226,6 +226,19 @@ fun MagitekRemoteScreen(
         resonanceLevel = detected
     }
 
+    LaunchedEffect(isDraggingDial) {
+        if (!isDraggingDial) return@LaunchedEffect
+        var dots = 0
+        while (true) {
+            safeLogChange(listOf(
+                "> RECHERCHE DE RÉSONANCE${".".repeat(dots + 1)}",
+                "> CHERCHEZ LE SIGNAL",
+            ))
+            dots = (dots + 1) % 3
+            delay(400L)
+        }
+    }
+
     LaunchedEffect(isDraggingDial, resonanceLevel) {
        /* if (isDraggingDial) {
             // Monte pendant le drag
@@ -351,8 +364,8 @@ fun MagitekRemoteScreen(
                     "> DÉCODÉ: —",
                 ) else listOf(
                     "> MODE TRADUCTEUR DÉSACTIVÉ",
-                    "> _",
-                )
+                "> _",
+            )
             )
             return
         }
@@ -512,7 +525,6 @@ fun MagitekRemoteScreen(
             }
         }
     }
-
 
 
     LifecycleEffect(
