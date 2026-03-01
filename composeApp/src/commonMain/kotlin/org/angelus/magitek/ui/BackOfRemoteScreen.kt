@@ -31,6 +31,17 @@ fun BackOfRemoteScreen(onSettingsClick: () -> Unit = {}, ) {
                 .fillMaxSize()
                 .drawBehind { drawMetalBackground(this) },
         ) {
+            Text(
+                text     = "⚙",
+                style    = MaterialTheme.typography.labelLarge.copy(
+                    color    = GarlemaldColors.ScreenGreen.copy(alpha = 0.4f),
+                    fontSize = 36.sp,
+                ),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .clickable(onClick = onSettingsClick)
+                    .padding(8.dp),
+            )
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -78,17 +89,7 @@ fun BackOfRemoteScreen(onSettingsClick: () -> Unit = {}, ) {
                 )
             }
 
-            Text(
-                text     = "⚙",
-                style    = MaterialTheme.typography.labelLarge.copy(
-                    color    = GarlemaldColors.MetalLight.copy(alpha = 0.4f),
-                    fontSize = 18.sp,
-                ),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .clickable(onClick = onSettingsClick)
-                    .padding(8.dp),
-            )
+
         }
     }
 }
