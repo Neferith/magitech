@@ -96,7 +96,7 @@ data class HiddenBackMessage(
 
 fun buildHiddenBackMessage(): HiddenBackMessage {
     // ← Modifie ce texte pour changer le message caché
-    val rawText = "Annah si jamais tu lis ce message, c’est que tu as récupéré ma télécommande. Viktor est ton frère. Code admin :  XAR XOK XAK XIK XER"
+    val rawText = "Annah si jamais tu lis ce message, c’est que tu as récupéré ma télécommande. Tu dois absolument le savoir, mais Viktor est ton frère. Code admin :  XAR XOK XAK XIK XER. Inutile d'essayer de me sauver. Un message de Y.N.Z"
 
     val words = rawText.split(" ").map { word ->
         MagitekCipher.encode(word)

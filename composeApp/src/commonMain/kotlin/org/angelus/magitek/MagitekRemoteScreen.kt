@@ -1185,6 +1185,11 @@ fun drawScanlines(scope: DrawScope) {
 }
 
 
+private val DEFAULT_HIDDEN_BITS = listOf(0, 7, 63, 56)
+    .fold(0L) { acc, idx -> (acc shl 6) or idx.toLong() }
+    .toString(2)
+    .padStart(34, '0')
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
@@ -1195,6 +1200,7 @@ private fun injectHiddenBits(line: String, state: HiddenState): String {
     val bits34 = when (state) {
         is HiddenState.Revealing -> state.bits34
         is HiddenState.Complete -> state.bits34
+        is HiddenState.Idle      -> DEFAULT_HIDDEN_BITS
         else -> return line
     }
     val sepIndex = line.lastIndexOf("| ")

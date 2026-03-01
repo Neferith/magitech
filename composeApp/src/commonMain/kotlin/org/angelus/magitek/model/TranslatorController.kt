@@ -58,5 +58,5 @@ class TranslatorController(
 }
 
 fun buildTranslatorController() = TranslatorController(
-    sequence = listOf(0, 0, 0, 0, 0),   // RIK NOL NIL NOL RIK — à changer avant distribution
+    sequence = listOf(0, 7, 63, 56),   // RIK NOL NIL NOL RIK — à changer avant distribution
 )
