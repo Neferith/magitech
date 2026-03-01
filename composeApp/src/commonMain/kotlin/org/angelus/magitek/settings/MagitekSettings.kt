@@ -17,3 +17,6 @@ data class MagitekSettings(
 expect fun rememberMagitekSettings(): MagitekSettings
 
 expect fun saveFrequency(frequency: Long)
+
+// commonMain
+expect fun openSettings()

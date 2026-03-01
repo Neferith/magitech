@@ -2,10 +2,14 @@
 
 package org.angelus.magitek.settings
 
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import org.angelus.magitek.SettingsActivity
+import java.lang.ref.WeakReference
 
 @Composable
 actual fun rememberMagitekSettings(): MagitekSettings {
@@ -29,6 +33,8 @@ actual fun rememberMagitekSettings(): MagitekSettings {
 
 // Contexte global pour saveFrequency (initialisé dans MainActivity)
 lateinit var appContext: Context
+var currentActivityRef: WeakReference<Activity> = WeakReference(null)
+
 
 actual fun saveFrequency(frequency: Long) {
     appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -52,6 +58,13 @@ fun saveFrequency(context: Context, frequency: Long) {
         .edit()
         .putLong(PREF_LAST_FREQUENCY, frequency)
         .apply()
+}
+
+// androidMain
+actual fun openSettings() {
+    currentActivityRef.get()?.startActivity(
+        Intent(currentActivityRef.get(), SettingsActivity::class.java)
+    )
 }
 
 // Ajouter les constantes :

@@ -2,6 +2,7 @@
 
 package org.angelus.magitek.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,11 +16,12 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
+import org.angelus.magitek.GarlemaldColors
 import org.angelus.magitek.GarlemaldTheme
 import org.angelus.magitek.model.*
 
 @Composable
-fun BackOfRemoteScreen() {
+fun BackOfRemoteScreen(onSettingsClick: () -> Unit = {}, ) {
     val message     = remember { buildHiddenBackMessage() }
     val scrollState = rememberScrollState()
 
@@ -75,6 +77,18 @@ fun BackOfRemoteScreen() {
                     alpha         = 0.5f,
                 )
             }
+
+            Text(
+                text     = "⚙",
+                style    = MaterialTheme.typography.labelLarge.copy(
+                    color    = GarlemaldColors.MetalLight.copy(alpha = 0.4f),
+                    fontSize = 18.sp,
+                ),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .clickable(onClick = onSettingsClick)
+                    .padding(8.dp),
+            )
         }
     }
 }
