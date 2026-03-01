@@ -96,14 +96,14 @@ data class HiddenBackMessage(
 
 fun buildHiddenBackMessage(): HiddenBackMessage {
     // ← Modifie ce texte pour changer le message caché
-    val rawText = "ANNAH EST LIBRE"
+    val rawText = "Annah si jamais tu lis ce message, c’est que tu as récupéré ma télécommande. Viktor est ton frère. Code admin :  XAR XOK XAK XIK XER"
 
     val words = rawText.split(" ").map { word ->
         MagitekCipher.encode(word)
     }
 
     return HiddenBackMessage(
-        title = "// DONNÉES SYSTÈME //",
+        title = "// Un message gravé à l'arrière de la télécommande //",
         words = words,
     )
 }
