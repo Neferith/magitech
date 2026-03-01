@@ -49,8 +49,12 @@ import org.angelus.magitek.model.buildTranslatorController
 import org.angelus.magitek.model.detectWithLevel
 import org.angelus.magitek.model.toDisplayBin64
 import org.angelus.magitek.model.toHex16
+import org.angelus.magitek.model.toHex
+import org.angelus.magitek.model.toBin
 import org.angelus.magitek.model.displayLabel
+import org.angelus.magitek.model.encode12
 import org.angelus.magitek.model.findById
+import org.angelus.magitek.model.getHiddenBits
 import org.angelus.magitek.repository.rememberButtonRepository
 import org.angelus.magitek.settings.rememberMagitekSettings
 import org.angelus.magitek.settings.saveFrequency
@@ -329,7 +333,6 @@ fun MagitekRemoteScreen(
     }
 
 
-
     // ── Gestion d'une pression simple (exécution) ─────────────────────────────
     fun executeButton(index: Int) {
 
@@ -398,8 +401,8 @@ fun MagitekRemoteScreen(
         when (val assignment = config.assignment) {
             is ButtonAssignment.SingleCommand -> {
                 feedback.triggerCommandFeedback()
-                //  val bits = assignment.command.encode64()
-                val bits = assignment.command.encode64WithFreq(globalFrequency)
+               /*   val bits = assignment.command.encode64()
+                val commandbits = assignment.command.encode64WithFreq(globalFrequency)
                 safeLogChange(
                     listOfNotNull(
                         "> CMD: ${/*assignment/*.command*/.displayLabel(config.customLabel)*/ButtonLabelEncoder.encode(
@@ -409,6 +412,29 @@ fun MagitekRemoteScreen(
                         "> HEX: 0x${bits.toHex16()}",
                         "> BIN: ${bits.toDisplayBin64()}",
                         //"> ${assignment.command.displayDescription()}",
+                        if (isEditMode) "> ${assignment.command.displayDescription()}" else null,
+                    )
+                )*/
+                val freq    = globalFrequency
+                val cmd12   = assignment.command.encode12()
+                val hidden  = getHiddenBits(hiddenState)   // retourne DEFAULT_HIDDEN_BITS_LONG ou state.bits34
+
+                val freqBin   = freq.toBin(18)
+                val cmdBin = cmd12.toBin(12).let {
+                    "${it.substring(0,4)}.${it.substring(4,8)}.${it.substring(8,12)}"
+                }
+                val hiddenBin = hidden.toBin(34).let { bits ->
+                    (0..4).joinToString(" | ") { i -> bits.substring(i*6, 6 + i*6) } +  // 5 × 6 bits
+                            " NAN ${bits.substring(30)}"                                             // 4 bits padding à la fin
+                }
+
+                Logger.d("BITS ", "> BIN: ${freqBin}  ${cmdBin}  ${hiddenBin}")
+
+                safeLogChange(
+                    listOfNotNull(
+                        "> CMD: ${ButtonLabelEncoder.encode(config.buttonIndex)}",
+                        "> HEX: 0x${freq.toHex(5)}  0x${cmd12.toHex(3)}  0x${hidden.toHex(9)}",
+                        "> BIN: ${freqBin}  ${cmdBin}  ${hiddenBin}",
                         if (isEditMode) "> ${assignment.command.displayDescription()}" else null,
                     )
                 )
@@ -916,10 +942,10 @@ fun CommandScreen(
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             displayLines.forEachIndexed { i, line ->
-                val displayLine =
-                    if (i == 2 && line.startsWith("> BIN:") && glitchEngine.corruptedLines == null) {
+                val displayLine = line
+                   /* if (i == 2 && line.startsWith("> BIN:") && glitchEngine.corruptedLines == null) {
                         injectHiddenBits(line, hiddenState)
-                    } else line
+                    } else line*/
 
                 Text(
                     text = displayLine,
@@ -929,7 +955,7 @@ fun CommandScreen(
                             GarlemaldColors.ScreenGreen.copy(alpha = 0.7f)
                         else lineColor(i, hiddenState),
                     ),
-                    maxLines = 2,
+                    maxLines = 3,
                     overflow = TextOverflow.Clip,
                 )
             }
@@ -1185,28 +1211,7 @@ fun drawScanlines(scope: DrawScope) {
 }
 
 
-private val DEFAULT_HIDDEN_BITS = listOf(0, 7, 63, 56)
-    .fold(0L) { acc, idx -> (acc shl 6) or idx.toLong() }
-    .toString(2)
-    .padStart(34, '0')
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/**
- * Remplace les 34 derniers bits de la ligne BIN par les bits du message caché.
- * Format attendu : "> BIN: [18 freq] | [4.4.4 cmd] | [34 réservés]"
- */
-private fun injectHiddenBits(line: String, state: HiddenState): String {
-    val bits34 = when (state) {
-        is HiddenState.Revealing -> state.bits34
-        is HiddenState.Complete -> state.bits34
-        is HiddenState.Idle      -> DEFAULT_HIDDEN_BITS
-        else -> return line
-    }
-    val sepIndex = line.lastIndexOf("| ")
-    if (sepIndex < 0) return line
-    return line.substring(0, sepIndex + 2) + bits34
-}
 
 /**
  * Couleur de la ligne selon l'état du message caché.

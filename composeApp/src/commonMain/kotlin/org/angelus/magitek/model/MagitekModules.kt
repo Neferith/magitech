@@ -373,3 +373,19 @@ fun Long.toDisplayBin64(): String {
 }
 
 fun Long.toHex16(): String = toString(16).uppercase().padStart(16, '0')
+
+fun Long.toHex(chars: Int) = java.lang.Long.toUnsignedString(this, 16)
+    .padStart(chars, '0').uppercase()
+
+fun Long.toBin(bits: Int) = this.toString(2).padStart(bits, '0')
+
+fun getHiddenBits(state: HiddenState): Long = when (state) {
+    is HiddenState.Revealing -> state.bits34.toLong(2)
+    is HiddenState.Complete  -> state.bits34.toLong(2)
+    else                     -> "0111100000100011100010000011010000".toLong(2)
+}
+
+fun CommandSpec.encode12(): Long =
+    moduleCode.toLong(2).shl(8) or
+            submoduleCode.toLong(2).shl(4) or
+            actionCode.toLong(2)
